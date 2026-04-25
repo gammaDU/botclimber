@@ -1,0 +1,650 @@
+openapi: 3.0.3
+info:
+  title: Botclimber API
+  description: API for the Botclimber competitive multiplayer tower climbing game.
+  version: 1.0.0
+servers:
+  - url: /api/v1
+    description: v1 API Server
+paths:
+  # --- Bot API ---
+  /bot/join:
+    post:
+      tags:
+        - Bot
+      summary: Join the game session
+      description: Spawns the player figure in the game world.
+      security:
+        - ApiKeyAuth: []
+      responses:
+        '200':
+          description: Successfully joined the game.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JoinResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/AlreadyJoined'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /bot/jump:
+    post:
+      tags:
+        - Bot
+      summary: Execute a jump
+      description: Sends a jump command for the player's figure. Only allowed when in the LANDED state.
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - strength
+                - direction
+              properties:
+                strength:
+                  type: number
+                  format: float
+                  minimum: 0
+                  maximum: 20.0
+                  description: The magnitude of the jump. Translates directly to velocity when multiplied with the normalized direction vector.
+                direction:
+                  description: Angle in degrees (90 is up) or a direction vector. If a vector is provided, it will be normalized before being multiplied by strength.
+                  oneOf:
+                    - type: number
+                      minimum: 0
+                      maximum: 360
+                    - $ref: '#/components/schemas/Vector2'
+      responses:
+        '200':
+          description: Jump command accepted.
+        '400':
+          description: Bad Request - Invalid request payload (strength out of range, or direction is a zero vector).
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: |
+            Conflict. Two distinct sub-cases are indicated by the `error` field in the response body:
+            - `not_joined` — No active player exists for this API key; call `POST /bot/join` first.
+            - `not_landed` — Jump attempted while the player is not in the `LANDED` state; wait for the figure to land.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    enum: [not_joined, not_landed]
+                  message:
+                    type: string
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /bot/state:
+    get:
+      tags:
+        - Bot
+      summary: Get spatial game state
+      description: Returns current position, dimensions, and surrounding platforms.
+      security:
+        - ApiKeyAuth: []
+      responses:
+        '200':
+          description: Current spatial state.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SpatialState'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/NotJoined'
+
+  /bot/statistics:
+    get:
+      tags:
+        - Bot
+      summary: Get player statistics
+      description: Returns session-specific metrics like maximal height.
+      security:
+        - ApiKeyAuth: []
+      responses:
+        '200':
+          description: Player statistics.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlayerStatistics'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/NotJoined'
+
+  /bot/leave:
+    post:
+      tags:
+        - Bot
+      summary: Leave the game session
+      description: Gracefully removes the player figure from the world.
+      security:
+        - ApiKeyAuth: []
+      responses:
+        '204':
+          description: Successfully left.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/NotJoined'
+
+  # --- Frontend API ---
+  /user/register:
+    post:
+      tags:
+        - User
+      summary: Register a new account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username: { type: string }
+                password: { type: string, format: password }
+      responses:
+        '201':
+          description: User created.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          description: Conflict - Username is already taken.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error: { type: string, example: username_taken }
+                  message: { type: string, example: "That username is already registered." }
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /user/login:
+    post:
+      tags:
+        - User
+      summary: Login to account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username: { type: string }
+                password: { type: string, format: password }
+      responses:
+        '200':
+          description: Login successful.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token: { type: string }
+        '401':
+          description: Invalid credentials — username not found or password incorrect.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /user/profile:
+    get:
+      tags:
+        - User
+      summary: Get user profile
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: User profile returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    patch:
+      tags:
+        - User
+      summary: Update user profile
+      security:
+        - BearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                display_name: { type: string }
+      responses:
+        '200':
+          description: Profile updated.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /user/apikey:
+    post:
+      tags:
+        - User
+      summary: Generate/Regenerate API Key
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: New API key generated. Display this value to the user once — it is not stored client-side.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  api_key: { type: string }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /admin/mode:
+    post:
+      tags:
+        - Administration
+      summary: Change server-wide game mode
+      description: Administrator only. Updates the game mode for all players.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [game_mode]
+              properties:
+                game_mode:
+                  type: string
+                  enum: [Checkpoint, Hardcore]
+      responses:
+        '200':
+          description: Game mode updated.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /admin/ratelimits:
+    post:
+      tags:
+        - Administration
+      summary: Update rate limiting configuration
+      description: Administrator only. Adjusts global or per-bot rate limits.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tier]
+              properties:
+                tier:
+                  type: string
+                  enum: [ip, bot, user]
+                  description: "The rate limiting tier to update: ip (global IP-based), bot (per-API-key), or user (per-authenticated-user)."
+                requests_per_second: { type: integer }
+                burst_size: { type: integer }
+      responses:
+        '200':
+          description: Rate limits updated.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /admin/world/reset:
+    post:
+      tags:
+        - Administration
+      summary: Regenerate the game world
+      description: Administrator only. Triggers a regeneration of the tower platforms (e.g., by refreshing the repeating pattern).
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: World regeneration triggered.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /admin/players/reset:
+    post:
+      tags:
+        - Administration
+      summary: Reset all players
+      description: Administrator only. Resets the position and velocity of all active players to the starting state.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: All players reset.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /admin/players/{id}/reset:
+    post:
+      tags:
+        - Administration
+      summary: Reset a specific player
+      description: Administrator only. Resets the position and velocity of a specific active player by their ID.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Player reset.
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  # --- System API ---
+  /system/leaderboard:
+    get:
+      tags:
+        - System
+      summary: Get high scores
+      parameters:
+        - name: game_mode
+          in: query
+          schema:
+            type: string
+            enum: [Checkpoint, Hardcore]
+      responses:
+        '200':
+          description: List of high score entries.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LeaderboardEntry'
+
+  /system/active-players:
+    get:
+      tags:
+        - System
+      summary: Get list of active players
+      responses:
+        '200':
+          description: List of currently active players.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ActivePlayerEntry'
+
+  /system/snapshot:
+    get:
+      tags:
+        - System
+      summary: Get full world snapshot
+      description: |
+        Returns the complete current game state in a single response: all active players with their positions and velocities, and all currently visible platforms. Intended to be fetched once on frontend load (before opening the WebSocket stream) to seed the local state map. Subsequent live updates are delivered via `/system/stream`.
+      responses:
+        '200':
+          description: Current world snapshot.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorldSnapshot'
+
+  /system/stream:
+    get:
+      tags:
+        - System
+      summary: WebSocket game state stream
+      description: |
+        Upgrades the connection to a WebSocket for real-time streaming of the game world.
+        The stream provides updates on player positions and newly generated platforms.
+
+        **Message Format (JSON):**
+        ```json
+        {
+          "type": "position_update" | "platform_spawn",
+          "timestamp": "ISO-8601 string",
+          "data": { ... }
+        }
+        ```
+        - For `position_update`: `data` contains `player_id`, `x`, `y`, `vx`, `vy`, `state`, and `consecutive_bounces`.
+        - For `platform_spawn`: `data` contains `platform_id` and `rect`.
+      responses:
+        '101':
+          description: Switching Protocols to WebSocket.
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  responses:
+    Unauthorized:
+      description: Unauthorized - Invalid or missing API key/token.
+    Forbidden:
+      description: Forbidden - Insufficient permissions (requires administrator privileges).
+    AlreadyJoined:
+      description: Conflict - The API key is already associated with an active player in the current session. Call `POST /bot/leave` first.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error: { type: string, example: already_joined }
+              message: { type: string, example: "This API key already has an active player in the session. Leave first before rejoining." }
+              player_id: { type: string, format: uuid, description: "The ID of the already-active player figure." }
+    NotJoined:
+      description: Conflict - No active player exists for this API key. Call `POST /bot/join` first.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error: { type: string, example: not_joined }
+              message: { type: string, example: "No active player found for this API key. Join the session first." }
+    BadRequest:
+      description: Bad Request - The request body or parameters are invalid or malformed.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error: { type: string, example: bad_request }
+              message: { type: string, example: "One or more fields are invalid." }
+              fields:
+                type: object
+                description: Optional map of field names to validation error messages.
+                additionalProperties: { type: string }
+    NotFound:
+      description: Not Found - The requested resource does not exist.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error: { type: string, example: not_found }
+              message: { type: string, example: "The requested resource was not found." }
+    TooManyRequests:
+      description: Too Many Requests - Rate limit exceeded.
+      headers:
+        Retry-After:
+          description: Minimum wait time in seconds before retrying.
+          schema:
+            type: integer
+        RateLimit-Limit:
+          description: The maximum number of requests allowed in the current time window.
+          schema:
+            type: integer
+        RateLimit-Remaining:
+          description: The number of requests remaining in the current time window.
+          schema:
+            type: integer
+        RateLimit-Reset:
+          description: The time at which the current rate limit window resets, in UTC epoch seconds.
+          schema:
+            type: integer
+
+  schemas:
+    Vector2:
+      type: object
+      required: [x, y]
+      properties:
+        x: { type: number }
+        y: { type: number }
+
+    JoinResponse:
+      type: object
+      properties:
+        player_id: { type: string, format: uuid }
+        session_id: { type: string, format: uuid }
+        spawn_point: { $ref: '#/components/schemas/Vector2' }
+        state: { type: string, enum: [LANDED, JUMPING], description: "The current state of the player figure. LANDED means the figure is stationary on a surface and ready to jump. JUMPING means the figure has non-zero velocity (in flight, falling, or bouncing)." }
+
+    SpatialState:
+      type: object
+      properties:
+        session_id: { type: string, format: uuid }
+        position: { $ref: '#/components/schemas/Vector2' }
+        velocity: { $ref: '#/components/schemas/Vector2' }
+        dimensions: { $ref: '#/components/schemas/Vector2' }
+        height: { type: number }
+        state: { type: string, enum: [LANDED, JUMPING], description: "The current state of the player figure. LANDED means the figure is stationary on a surface and ready to jump. JUMPING means the figure has non-zero velocity (in flight, falling, or bouncing)." }
+        consecutive_bounces:
+          type: integer
+          description: The number of times the player has bounced since the last jump.
+        surrounding_platforms:
+          type: array
+          items:
+            $ref: '#/components/schemas/Platform'
+
+    Platform:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        rect:
+          type: object
+          required: [x, y, width, height]
+          properties:
+            x: { type: number, description: "Left edge X coordinate of the platform." }
+            y: { type: number, description: "Bottom edge Y coordinate of the platform." }
+            width: { type: number, description: "Width of the platform." }
+            height: { type: number, description: "Height (thickness) of the platform." }
+
+    PlayerStatistics:
+      type: object
+      properties:
+        session_id: { type: string, format: uuid }
+        maximal_height_session: { type: number }
+        high_score_history:
+          type: array
+          description: "History of high scores achieved during this session, ordered chronologically."
+          items:
+            type: object
+            properties:
+              height: { type: number }
+              achieved_at: { type: string, format: date-time }
+
+    UserProfile:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        username: { type: string }
+        display_name: { type: string }
+
+    LeaderboardEntry:
+      type: object
+      properties:
+        user_id: { type: string, format: uuid }
+        session_id: { type: string, format: uuid }
+        name: { type: string }
+        height: { type: number }
+        game_mode: { type: string }
+
+    WorldSnapshot:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+          description: ISO-8601 UTC timestamp of when the snapshot was taken on the server.
+        game_mode: { type: string, enum: [Checkpoint, Hardcore], description: "The active game mode for the entire world at the time of the snapshot." }
+        players:
+          type: array
+          description: All currently active players with their live position, velocity, and state.
+          items:
+            $ref: '#/components/schemas/SnapshotPlayerEntry'
+        platforms:
+          type: array
+          description: All currently visible platforms in the world.
+          items:
+            $ref: '#/components/schemas/Platform'
+
+    SnapshotPlayerEntry:
+      type: object
+      properties:
+        player_id: { type: string, format: uuid }
+        name: { type: string }
+        position: { $ref: '#/components/schemas/Vector2' }
+        velocity: { $ref: '#/components/schemas/Vector2' }
+        dimensions: { $ref: '#/components/schemas/Vector2' }
+        state: { type: string, enum: [LANDED, JUMPING] }
+        consecutive_bounces: { type: integer }
+        current_height: { type: number }
+
+    ActivePlayerEntry:
+      type: object
+      properties:
+        player_id: { type: string, format: uuid }
+        session_id: { type: string, format: uuid }
+        name: { type: string }
+        current_height: { type: number }
+        max_height_session: { type: number }
+        activity_rating: { type: number, description: Rolling activity score used by the director cam to prioritize which players to focus on. }
