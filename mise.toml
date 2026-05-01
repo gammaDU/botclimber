@@ -1,0 +1,19 @@
+[tools]
+node = "20"
+
+[tasks.frontend-install]
+description = "Install frontend npm dependencies"
+dir = "frontend"
+run = "npm install"
+
+[tasks.frontend-build]
+description = "Build the Angular frontend (outputs to frontend/dist/)"
+dir = "frontend"
+run = "npm run build"
+depends = ["frontend-install"]
+
+[tasks.frontend-dev]
+description = "Start the Angular dev server with API proxy (http://localhost:4200)"
+dir = "frontend"
+run = "npm start"
+depends = ["frontend-install"]

@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Botclimber</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <h1>Botclimber</h1>
+    <nav id="nav">
+      <button id="btn-leaderboard" class="nav-btn active">Leaderboard</button>
+      <button id="btn-spectate" class="nav-btn">Spectate</button>
+      <button id="btn-account" class="nav-btn">Account</button>
+    </nav>
+  </header>
+
+  <main>
+    <!-- ── Spectator view ── -->
+    <section id="view-spectate" class="view hidden">
+      <div id="status-bar">
+        <span id="connection-status" class="status-disconnected">Disconnected</span>
+        <span id="active-players-count">Players: 0</span>
+      </div>
+      <div id="game-container">
+        <canvas id="game-canvas" width="480" height="640">
+          Your browser does not support the canvas element.
+        </canvas>
+        <aside id="session-panel">
+          <h2>Active Session</h2>
+          <ul id="session-list"></ul>
+        </aside>
+      </div>
+      <div id="cam-controls">
+        <button id="btn-director-cam" class="active">Director Cam</button>
+        <span id="following-label"></span>
+      </div>
+    </section>
+
+    <!-- ── Leaderboard view ── -->
+    <section id="view-leaderboard" class="view">
+      <h2>All-Time High Scores</h2>
+      <div id="mode-tabs">
+        <button class="mode-tab active" data-mode="checkpoint">Checkpoint</button>
+        <button class="mode-tab" data-mode="hardcore">Hardcore</button>
+      </div>
+      <table id="leaderboard-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Player</th>
+            <th>Height (m)</th>
+            <th>Mode</th>
+          </tr>
+        </thead>
+        <tbody id="leaderboard-body">
+          <tr><td colspan="4">Loading…</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- ── Account view ── -->
+    <section id="view-account" class="view hidden">
+      <!-- Login / Register forms (shown when logged out) -->
+      <div id="auth-forms">
+        <div id="form-login" class="auth-card">
+          <h2>Login</h2>
+          <form id="login-form">
+            <label>Username <input type="text" id="login-username" required /></label>
+            <label>Password <input type="password" id="login-password" required /></label>
+            <button type="submit">Login</button>
+            <p class="form-error" id="login-error"></p>
+          </form>
+          <p>No account? <a href="#" id="link-to-register">Register</a></p>
+        </div>
+
+        <div id="form-register" class="auth-card hidden">
+          <h2>Register</h2>
+          <form id="register-form">
+            <label>Username <input type="text" id="reg-username" required /></label>
+            <label>Password <input type="password" id="reg-password" required /></label>
+            <button type="submit">Register</button>
+            <p class="form-error" id="reg-error"></p>
+          </form>
+          <p>Already have an account? <a href="#" id="link-to-login">Login</a></p>
+        </div>
+      </div>
+
+      <!-- Profile panel (shown when logged in) -->
+      <div id="profile-panel" class="hidden">
+        <h2>Profile</h2>
+        <p>Logged in as <strong id="profile-username"></strong></p>
+        <section class="profile-section">
+          <h3>API Key</h3>
+          <p id="api-key-display" class="mono">—</p>
+          <button id="btn-generate-key">Generate / Rotate Key</button>
+        </section>
+        <section class="profile-section">
+          <h3>Change Password</h3>
+          <form id="change-password-form">
+            <label>New Password <input type="password" id="new-password" required /></label>
+            <button type="submit">Update</button>
+            <p class="form-error" id="pw-error"></p>
+          </form>
+        </section>
+        <button id="btn-logout">Logout</button>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
