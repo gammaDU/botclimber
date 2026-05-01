@@ -1,10 +1,10 @@
 [tools]
-node = "20"
+node = "25"
 
 [tasks.frontend-install]
 description = "Install frontend npm dependencies"
 dir = "frontend"
-run = "npm install"
+run = "npm install --legacy-peer-deps"
 
 [tasks.frontend-build]
 description = "Build the Angular frontend (outputs to frontend/dist/)"
