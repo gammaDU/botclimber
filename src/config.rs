@@ -61,13 +61,13 @@ pub struct AppConfig {
 }
 
 impl AppConfig {
-    pub fn load() -> Result<Self> {
+    pub fn load(config_path: &str) -> Result<Self> {
         let cfg = config::Config::builder()
             // [server]
             .set_default("server.bind", "0.0.0.0:8080")?
             .set_default("server.frontend_dist_path", "frontend/dist")?
             // [database]
-            .set_default("database.path", "botclimber.db")?
+            .set_default("database.path", ".data/botclimber.db")?
             // [auth]
             .set_default("auth.jwt_secret", "")?
             .set_default("auth.jwt_expiry_secs", 3600_i64)?
@@ -83,9 +83,9 @@ impl AppConfig {
             .set_default("game.player_timeout_secs", 60_i64)?
             .set_default("game.max_players", 50_i64)?
             .set_default("game.tick_rate_hz", 60.0_f64)?
-            // Optional config.toml file
+            // Config file passed as CLI argument
             .add_source(
-                config::File::with_name("config")
+                config::File::with_name(config_path)
                     .format(config::FileFormat::Toml)
                     .required(false),
             )

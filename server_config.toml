@@ -1,0 +1,25 @@
+[server]
+bind = "0.0.0.0:8080"
+frontend_dist_path = "frontend/dist"
+
+[database]
+path = ".data/botclimber.db"
+
+[auth]
+# Must be at least 32 characters. Set via env: BOTCLIMBER__AUTH__JWT_SECRET
+jwt_secret = "change-me-to-a-secret-of-at-least-32-chars"
+jwt_expiry_secs = 3600
+
+[rate_limiting]
+ip_requests_per_second = 100
+ip_burst_size = 200
+bot_requests_per_second = 10
+bot_burst_size = 20
+user_requests_per_second = 30
+user_burst_size = 60
+
+[game]
+default_game_mode = "Checkpoint"
+player_timeout_secs = 60
+max_players = 50
+tick_rate_hz = 60.0

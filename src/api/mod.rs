@@ -24,6 +24,6 @@ pub fn router(state: Arc<AppState>) -> Router {
     Router::new()
         .nest("/api/v1", api)
         // Serve compiled frontend from frontend/dist/ at "/"
-        .fallback_service(ServeDir::new("frontend/dist"))
+        .fallback_service(ServeDir::new("frontend/dist/browser"))
         .layer(TraceLayer::new_for_http())
 }

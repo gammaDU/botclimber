@@ -1,6 +1,7 @@
 use anyhow::Result;
 use std::sync::Arc;
 use tracing::info;
+use std::env;
 
 mod api;
 mod config;
@@ -23,7 +24,8 @@ async fn main() -> Result<()> {
         )
         .init();
 
-    let cfg = AppConfig::load()?;
+    let config_path = env::args().nth(1).unwrap_or_else(|| "server_config".to_string());
+    let cfg = AppConfig::load(&config_path)?;
     info!("Configuration loaded");
 
     let db = Database::open(&cfg.database.path)?;
@@ -34,7 +36,7 @@ async fn main() -> Result<()> {
     let app = api::router(state.clone());
 
     let bind_addr = cfg.server.bind.parse::<std::net::SocketAddr>()?;
-    info!("Listening on {bind_addr}");
+    info!("Server listening on http://{bind_addr}");
 
     let listener = tokio::net::TcpListener::bind(bind_addr).await?;
 

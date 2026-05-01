@@ -14,11 +14,11 @@ depends = ["frontend-install"]
 
 [tasks.migrate]
 description = "Run database migrations"
-run = "cargo run --bin migrate -- botclimber.db"
+run = "cargo run --bin migrate -- .data/botclimber.db"
 
-[tasks.serve]
+[tasks.server]
 description = "Start the backend server"
-run = "cargo run"
+run = "cargo run --bin botclimber -- server_config.toml"
 depends = ["frontend-build"]
 
 [tasks.clippy]

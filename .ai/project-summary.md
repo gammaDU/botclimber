@@ -28,7 +28,7 @@ See `docs/requirements.md` for an index of available documentation.
 ## How to Run
 
 ```powershell
-cargo run --bin migrate -- botclimber.db   # apply DB migrations
+cargo run --bin migrate -- .data/botclimber.db   # apply DB migrations
 mise run frontend-build                    # build Angular frontend
 cargo run                                  # start server at http://localhost:8080
 ```
