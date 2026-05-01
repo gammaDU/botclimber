@@ -107,7 +107,7 @@ struct SnapshotPlayerEntry {
     name: String,
     position: PositionBody,
     velocity: PositionBody,
-    is_grounded: bool,
+    state: String,
 }
 
 #[derive(Serialize)]
@@ -138,7 +138,7 @@ async fn snapshot(
             name: p.name.clone(),
             position: PositionBody { x: p.position.x, y: p.position.y },
             velocity: PositionBody { x: p.velocity.x, y: p.velocity.y },
-            is_grounded: p.is_grounded,
+            state: format!("{:?}", p.state),
         })
         .collect();
 

@@ -84,6 +84,15 @@ impl Database {
         }
     }
 
+    pub fn update_display_name(&self, user_id: &str, display_name: &str) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "UPDATE users SET display_name = ?1 WHERE id = ?2",
+            params![display_name, user_id],
+        )?;
+        Ok(())
+    }
+
     pub fn update_api_key_hash(&self, user_id: &str, new_hash: &str) -> Result<()> {
         let conn = self.conn.lock().unwrap();
         conn.execute(

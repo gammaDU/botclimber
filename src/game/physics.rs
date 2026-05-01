@@ -1,10 +1,10 @@
 /// Physics constants from game_rules.md
-pub const GRAVITY: f64 = -9.8;
+pub const GRAVITY: f64 = -10.0;
 pub const TICK_RATE_HZ: f64 = 60.0;
 pub const DT: f64 = 1.0 / TICK_RATE_HZ;
 
-pub const PLAYER_WIDTH: f64 = 1.0;
-pub const PLAYER_HEIGHT: f64 = 2.0;
+pub const PLAYER_WIDTH: f64 = 0.8;
+pub const PLAYER_HEIGHT: f64 = 0.8;
 
 pub const JUMP_STRENGTH_MIN: f64 = 0.0;
 pub const JUMP_STRENGTH_MAX: f64 = 20.0;
@@ -13,12 +13,12 @@ pub const JUMP_STRENGTH_MAX: f64 = 20.0;
 /// platform landings within the same jump (100 %, 75 %, 50 %, 25 %, 0 %).
 pub const BOUNCE_SCHEDULE: &[f64] = &[1.0, 0.75, 0.50, 0.25, 0.0];
 
-pub const DEATH_Y: f64 = -10.0;
+pub const DEATH_DROP: f64 = 15.0;
 
 use crate::models::{Platform, PlayerState, Rect, Vector2};
 
 /// Apply one physics tick to a single player.
-/// Returns `true` if the player died (fell below DEATH_Y) and should be reset.
+/// Returns `true` if the player died (fell more than DEATH_DROP below session peak) and should be reset.
 pub fn tick_player(player: &mut PlayerState, platforms: &[Platform]) -> bool {
     // Apply gravity
     player.velocity.y += GRAVITY * DT;
@@ -44,14 +44,14 @@ pub fn tick_player(player: &mut PlayerState, platforms: &[Platform]) -> bool {
             player.position.y = platform.rect.y + platform.rect.height;
             player.position.x = new_pos.x;
 
-            let bounce_idx = player.jump_count.min(BOUNCE_SCHEDULE.len() as u32 - 1) as usize;
+            let bounce_idx = player.consecutive_bounces.min(BOUNCE_SCHEDULE.len() as u32 - 1) as usize;
             let multiplier = BOUNCE_SCHEDULE[bounce_idx];
             player.velocity.y = player.velocity.y.abs() * multiplier;
             player.velocity.x *= multiplier;
 
-            player.is_grounded = true;
+            player.state = crate::models::PlayerMovementState::Landed;
             player.last_landed_position = player.position;
-            player.jump_count = 0;
+            player.consecutive_bounces = 0;
             landed = true;
             break;
         }
@@ -59,7 +59,7 @@ pub fn tick_player(player: &mut PlayerState, platforms: &[Platform]) -> bool {
 
     if !landed {
         player.position = new_pos;
-        player.is_grounded = false;
+        player.state = crate::models::PlayerMovementState::Jumping;
     }
 
     // Update session max height
@@ -67,8 +67,8 @@ pub fn tick_player(player: &mut PlayerState, platforms: &[Platform]) -> bool {
         player.session_max_height = player.position.y;
     }
 
-    // Death check
-    player.position.y < DEATH_Y
+    // Death check: player fell more than DEATH_DROP below their session peak
+    player.position.y < player.session_max_height - DEATH_DROP
 }
 
 /// Apply a jump command to a player.
@@ -87,8 +87,8 @@ pub fn apply_jump(
         x: unit.x * strength,
         y: unit.y * strength,
     };
-    player.is_grounded = false;
-    player.jump_count += 1;
+    player.state = crate::models::PlayerMovementState::Jumping;
+    player.consecutive_bounces += 1;
     Ok(())
 }
 
@@ -114,8 +114,8 @@ mod tests {
             name: "test".into(),
             position: Vector2::new(0.0, 5.0),
             velocity: Vector2::zero(),
-            is_grounded: false,
-            jump_count: 0,
+            state: crate::models::PlayerMovementState::Jumping,
+            consecutive_bounces: 0,
             session_max_height: 5.0,
             activity_rating: 0.0,
             last_heartbeat: Utc::now(),
@@ -170,14 +170,15 @@ mod tests {
 
         // First landing: multiplier = 1.0 (100 %)
         tick_player(&mut p, &[platform.clone()]);
-        assert!(p.is_grounded);
-        assert_eq!(p.jump_count, 0);
+        assert_eq!(p.state, crate::models::PlayerMovementState::Landed);
+        assert_eq!(p.consecutive_bounces, 0);
     }
 
     #[test]
     fn death_below_threshold() {
         let mut p = make_player();
-        p.position = Vector2::new(0.0, DEATH_Y - 1.0);
+        p.session_max_height = 0.0;
+        p.position = Vector2::new(0.0, -(DEATH_DROP + 1.0));
         p.velocity = Vector2::new(0.0, -1.0);
         let died = tick_player(&mut p, &[]);
         assert!(died);

@@ -112,6 +112,13 @@ pub struct HighScore {
 // In-memory runtime state  (§2 of data_model.md)
 // ---------------------------------------------------------------------------
 
+/// Movement state of a player (§2.1).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum PlayerMovementState {
+    Landed,
+    Jumping,
+}
+
 /// Per-player runtime state (§2.1).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PlayerState {
@@ -120,8 +127,8 @@ pub struct PlayerState {
     pub name: String,
     pub position: Vector2,
     pub velocity: Vector2,
-    pub is_grounded: bool,
-    pub jump_count: u32,
+    pub state: PlayerMovementState,
+    pub consecutive_bounces: u32,
     pub session_max_height: f64,
     /// Rolling activity score used by the director cam.
     pub activity_rating: f64,
@@ -143,6 +150,8 @@ pub struct State {
 pub struct WorldState {
     pub platforms: Vec<Platform>,
     pub tick: u64,
+    /// TODO: use seed for deterministic world generation.
+    pub seed: u64,
 }
 
 /// A single platform (§2.4).

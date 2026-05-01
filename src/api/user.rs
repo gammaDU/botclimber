@@ -3,6 +3,7 @@ use std::sync::Arc;
 use axum::{
     Json, Router,
     extract::State,
+    http::StatusCode,
     routing::{get, post},
 };
 use serde::{Deserialize, Serialize};
@@ -16,7 +17,7 @@ pub fn router() -> Router<Arc<AppState>> {
     Router::new()
         .route("/register", post(register))
         .route("/login", post(login))
-        .route("/profile", get(profile))
+        .route("/profile", get(profile).patch(update_profile))
         .route("/apikey", post(regenerate_apikey))
 }
 
@@ -33,7 +34,6 @@ struct RegisterRequest {
 #[derive(Serialize)]
 struct RegisterResponse {
     user_id: Uuid,
-    api_key: String,
 }
 
 async fn register(
@@ -63,7 +63,7 @@ async fn register(
         .create_user(&id_str, &username, &password_hash, &api_key_hash, &now)
         .map_err(|_| AppError::Conflict("username already taken".into()))?;
 
-    Ok(Json(RegisterResponse { user_id, api_key }))
+    Ok(Json(RegisterResponse { user_id }))
 }
 
 // ---------------------------------------------------------------------------
@@ -104,8 +104,8 @@ async fn login(
         &user_id,
         &row.username,
         false,
-        &state.config.auth_jwt_secret,
-        state.config.auth_jwt_expiry_secs,
+        &state.config.auth.jwt_secret,
+        state.config.auth.jwt_expiry_secs,
     )?;
 
     Ok(Json(LoginResponse { token }))
@@ -129,6 +129,24 @@ async fn profile(
         user_id: claims.sub,
         username: claims.username,
     }))
+}
+
+// ---------------------------------------------------------------------------
+// PATCH /api/v1/user/profile
+// ---------------------------------------------------------------------------
+
+#[derive(Deserialize)]
+struct UpdateProfileRequest {
+    display_name: String,
+}
+
+async fn update_profile(
+    AuthUser(claims): AuthUser,
+    State(state): State<Arc<AppState>>,
+    Json(body): Json<UpdateProfileRequest>,
+) -> ApiResult<StatusCode> {
+    state.db.update_display_name(&claims.sub, &body.display_name)?;
+    Ok(StatusCode::NO_CONTENT)
 }
 
 // ---------------------------------------------------------------------------

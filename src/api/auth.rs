@@ -106,7 +106,7 @@ where
     async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
         let app: Arc<AppState> = FromRef::from_ref(state);
         let token = bearer_token(&parts.headers)?;
-        let claims = decode_jwt(token, &app.config.auth_jwt_secret)?;
+        let claims = decode_jwt(token, &app.config.auth.jwt_secret)?;
         Ok(AuthUser(claims))
     }
 }

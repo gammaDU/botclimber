@@ -61,7 +61,7 @@ async fn set_mode(
 struct SetRateLimitsRequest {
     tier: String,
     requests_per_second: u32,
-    burst: u32,
+    burst_size: u32,
 }
 
 async fn set_ratelimits(
@@ -86,6 +86,7 @@ async fn world_reset(
     let mut game = state.game.write().await;
     game.world.platforms = initial_platforms();
     game.world.tick = 0;
+    game.world.seed = 0; // TODO: generate new seed on world reset
     game.players.clear();
 
     let event = serde_json::json!({

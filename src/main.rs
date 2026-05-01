@@ -26,14 +26,14 @@ async fn main() -> Result<()> {
     let cfg = AppConfig::load()?;
     info!("Configuration loaded");
 
-    let db = Database::open(&cfg.database_path)?;
-    info!("Database ready at {}", cfg.database_path);
+    let db = Database::open(&cfg.database.path)?;
+    info!("Database ready at {}", cfg.database.path);
 
     let state = Arc::new(AppState::new(cfg.clone(), db));
 
     let app = api::router(state.clone());
 
-    let bind_addr = cfg.server_bind.parse::<std::net::SocketAddr>()?;
+    let bind_addr = cfg.server.bind.parse::<std::net::SocketAddr>()?;
     info!("Listening on {bind_addr}");
 
     let listener = tokio::net::TcpListener::bind(bind_addr).await?;

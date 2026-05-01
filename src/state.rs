@@ -24,6 +24,7 @@ pub struct AppState {
 impl AppState {
     pub fn new(config: AppConfig, db: Database) -> Self {
         let game_mode = config
+            .game
             .default_game_mode
             .parse::<GameMode>()
             .unwrap_or(GameMode::Checkpoint);
@@ -34,6 +35,7 @@ impl AppState {
             world: WorldState {
                 platforms: Vec::new(),
                 tick: 0,
+                seed: 0, // TODO: generate or load seed for deterministic world generation
             },
             players: HashMap::new(),
         };

@@ -55,10 +55,10 @@ async fn join(
         session_id,
         user_id: player_id, // placeholder until real user lookup
         name: body.name.clone(),
-        position: Vector2::new(0.0, 1.0),
+        position: Vector2::new(0.0, 0.0),
         velocity: Vector2::zero(),
-        is_grounded: false,
-        jump_count: 0,
+        state: crate::models::PlayerMovementState::Jumping,
+        consecutive_bounces: 0,
         session_max_height: 0.0,
         activity_rating: 0.0,
         last_heartbeat: Utc::now(),
@@ -88,10 +88,12 @@ struct JumpRequest {
     strength: f64,
 }
 
+/// Accepts either a vector `{"x": .., "y": ..}` or an angle `{"angle_deg": ..}` (0=right, CCW).
 #[derive(Deserialize)]
-struct DirectionBody {
-    x: f64,
-    y: f64,
+#[serde(untagged)]
+enum DirectionBody {
+    Vector { x: f64, y: f64 },
+    Angle { angle_deg: f64 },
 }
 
 async fn jump(
@@ -100,14 +102,28 @@ async fn jump(
     Json(body): Json<JumpRequest>,
 ) -> ApiResult<Json<serde_json::Value>> {
     // TODO: resolve player_id from api_key
-    let direction = Vector2::new(body.direction.x, body.direction.y);
-
+    let direction = match body.direction {
+        DirectionBody::Vector { x, y } => Vector2::new(x, y),
+        DirectionBody::Angle { angle_deg } => {
+            let rad = angle_deg.to_radians();
+            Vector2::new(rad.cos(), rad.sin())
+        }
+    };
     // Validate here so we can return 400 before acquiring the write lock.
     if direction.normalize().is_none() {
         return Err(AppError::BadRequest("direction must not be a zero vector".into()));
     }
     if body.strength < physics::JUMP_STRENGTH_MIN || body.strength > physics::JUMP_STRENGTH_MAX {
         return Err(AppError::BadRequest("strength out of range".into()));
+    }
+
+    // TODO: replace placeholder player_id with real lookup from api_key
+    // For now we skip the grounded check when no player is found (join not yet called).
+    {
+        let game = state.game.read().await;
+        // player_id is not yet resolved from api_key; check is a no-op until that TODO is done.
+        // When resolved, replace the block below with the real player_id.
+        let _ = &game.players; // placeholder reference
     }
 
     Ok(Json(serde_json::json!({ "status": "ok" })))

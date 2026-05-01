@@ -2,61 +2,97 @@ use anyhow::Result;
 use serde::Deserialize;
 
 #[derive(Debug, Clone, Deserialize)]
-pub struct AppConfig {
-    /// Path to the SQLite database file.
-    /// Override with BOTCLIMBER_DATABASE_PATH.
-    pub database_path: String,
-
+pub struct ServerConfig {
     /// Host:port the HTTP server binds to.
-    /// Override with BOTCLIMBER_SERVER_BIND.
-    pub server_bind: String,
+    pub bind: String,
+    /// Path to the built frontend dist folder served as static files.
+    pub frontend_dist_path: String,
+}
 
-    /// Secret used to sign and verify JWTs.
-    /// Must be set via BOTCLIMBER_AUTH_JWT_SECRET; never hardcode.
-    pub auth_jwt_secret: String,
+#[derive(Debug, Clone, Deserialize)]
+pub struct DatabaseConfig {
+    /// Path to the SQLite database file.
+    pub path: String,
+}
 
+#[derive(Debug, Clone, Deserialize)]
+pub struct AuthConfig {
+    /// Secret used to sign and verify JWTs. Must be at least 32 characters.
+    pub jwt_secret: String,
     /// JWT expiry in seconds (default 3600).
-    pub auth_jwt_expiry_secs: u64,
+    pub jwt_expiry_secs: u64,
+}
 
+#[derive(Debug, Clone, Deserialize)]
+pub struct RateLimitingConfig {
+    /// Max requests per second per IP (global).
+    pub ip_requests_per_second: u32,
+    /// Burst allowance for IP-level limiting.
+    pub ip_burst_size: u32,
+    /// Max requests per second per bot API key.
+    pub bot_requests_per_second: u32,
+    /// Burst allowance for bot-level limiting.
+    pub bot_burst_size: u32,
+    /// Max requests per second per user JWT.
+    pub user_requests_per_second: u32,
+    /// Burst allowance for user-level limiting.
+    pub user_burst_size: u32,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct GameConfig {
     /// Default game mode on startup ("Checkpoint" or "Hardcore").
     pub default_game_mode: String,
-
     /// Seconds of inactivity before a player session is cleaned up.
     pub player_timeout_secs: u64,
+    /// Maximum number of concurrent players.
+    pub max_players: u32,
+    /// Physics tick rate in Hz.
+    pub tick_rate_hz: f64,
+}
 
-    /// Global rate limit: max requests per second per IP.
-    pub rate_limit_global_rps: u32,
-
-    /// Per-API-key rate limit: max requests per second.
-    pub rate_limit_bot_rps: u32,
-
-    /// Burst allowance on top of the steady-state rate.
-    pub rate_limit_burst: u32,
+#[derive(Debug, Clone, Deserialize)]
+pub struct AppConfig {
+    pub server: ServerConfig,
+    pub database: DatabaseConfig,
+    pub auth: AuthConfig,
+    pub rate_limiting: RateLimitingConfig,
+    pub game: GameConfig,
 }
 
 impl AppConfig {
     pub fn load() -> Result<Self> {
         let cfg = config::Config::builder()
-            // Base defaults
-            .set_default("database_path", "botclimber.db")?
-            .set_default("server_bind", "0.0.0.0:8080")?
-            .set_default("auth_jwt_secret", "")?
-            .set_default("auth_jwt_expiry_secs", 3600_i64)?
-            .set_default("default_game_mode", "Checkpoint")?
-            .set_default("player_timeout_secs", 60_i64)?
-            .set_default("rate_limit_global_rps", 100_i64)?
-            .set_default("rate_limit_bot_rps", 10_i64)?
-            .set_default("rate_limit_burst", 20_i64)?
+            // [server]
+            .set_default("server.bind", "0.0.0.0:8080")?
+            .set_default("server.frontend_dist_path", "frontend/dist")?
+            // [database]
+            .set_default("database.path", "botclimber.db")?
+            // [auth]
+            .set_default("auth.jwt_secret", "")?
+            .set_default("auth.jwt_expiry_secs", 3600_i64)?
+            // [rate_limiting]
+            .set_default("rate_limiting.ip_requests_per_second", 100_i64)?
+            .set_default("rate_limiting.ip_burst_size", 200_i64)?
+            .set_default("rate_limiting.bot_requests_per_second", 10_i64)?
+            .set_default("rate_limiting.bot_burst_size", 20_i64)?
+            .set_default("rate_limiting.user_requests_per_second", 30_i64)?
+            .set_default("rate_limiting.user_burst_size", 60_i64)?
+            // [game]
+            .set_default("game.default_game_mode", "Checkpoint")?
+            .set_default("game.player_timeout_secs", 60_i64)?
+            .set_default("game.max_players", 50_i64)?
+            .set_default("game.tick_rate_hz", 60.0_f64)?
             // Optional config.toml file
             .add_source(
                 config::File::with_name("config")
                     .format(config::FileFormat::Toml)
                     .required(false),
             )
-            // Environment variable overrides (e.g. BOTCLIMBER_DATABASE_PATH)
+            // Environment variable overrides (e.g. BOTCLIMBER__AUTH__JWT_SECRET)
             .add_source(
                 config::Environment::with_prefix("BOTCLIMBER")
-                    .separator("_")
+                    .separator("__")
                     .try_parsing(true),
             )
             .build()?;
@@ -67,9 +103,14 @@ impl AppConfig {
     }
 
     fn validate(&self) -> Result<()> {
-        if self.auth_jwt_secret.is_empty() {
+        if self.auth.jwt_secret.is_empty() {
             anyhow::bail!(
-                "BOTCLIMBER_AUTH_JWT_SECRET must be set to a non-empty value before starting the server"
+                "auth.jwt_secret (or BOTCLIMBER__AUTH__JWT_SECRET) must be set before starting the server"
+            );
+        }
+        if self.auth.jwt_secret.len() < 32 {
+            anyhow::bail!(
+                "auth.jwt_secret must be at least 32 characters long"
             );
         }
         Ok(())
