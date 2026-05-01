@@ -5,6 +5,7 @@ use uuid::Uuid;
 
 use crate::config::AppConfig;
 use crate::db::Database;
+use crate::game::world;
 use crate::models::{GameMode, State, WorldState};
 
 /// Capacity of the broadcast channel for WebSocket events.
@@ -19,6 +20,8 @@ pub struct AppState {
     /// Broadcast sender for WebSocket events.
     /// Handlers clone the sender; spectators subscribe via `sender.subscribe()`.
     pub ws_tx: broadcast::Sender<Arc<String>>,
+    /// Maps api_key_hash → player_id for fast bot-endpoint lookups.
+    pub api_key_map: RwLock<HashMap<String, Uuid>>,
 }
 
 impl AppState {
@@ -33,7 +36,7 @@ impl AppState {
             session_id: Uuid::new_v4(),
             game_mode,
             world: WorldState {
-                platforms: Vec::new(),
+                platforms: world::initial_platforms(),
                 tick: 0,
                 seed: 0, // TODO: generate or load seed for deterministic world generation
             },
@@ -47,6 +50,7 @@ impl AppState {
             db,
             game: RwLock::new(initial_state),
             ws_tx,
+            api_key_map: RwLock::new(HashMap::new()),
         }
     }
 

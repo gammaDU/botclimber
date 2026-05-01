@@ -9,7 +9,7 @@ use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::api::auth::BotApiKey;
+use crate::api::auth::{BotApiKey, hash_api_key};
 use crate::error::{ApiResult, AppError};
 use crate::game::physics;
 use crate::models::{PlayerState, Vector2};
@@ -40,12 +40,20 @@ struct JoinResponse {
 }
 
 async fn join(
-    BotApiKey(_api_key): BotApiKey,
+    BotApiKey(api_key): BotApiKey,
     State(state): State<Arc<AppState>>,
     Json(body): Json<JoinRequest>,
 ) -> ApiResult<Json<JoinResponse>> {
-    // TODO: look up user by api_key_hash via DB, verify they exist, enforce 50-player cap.
-    // Requires a connection pool (e.g. deadpool-sqlite) to be Send-safe across await points.
+    let key_hash = hash_api_key(&api_key);
+
+    // Reject if this key already has an active player in the session.
+    {
+        let map = state.api_key_map.read().await;
+        if map.contains_key(&key_hash) {
+            return Err(AppError::BadRequest("already joined the current session".into()));
+        }
+    }
+
     let player_id = Uuid::new_v4();
     let game = state.game.read().await;
     let session_id = game.session_id;
@@ -53,7 +61,7 @@ async fn join(
 
     let player = PlayerState {
         session_id,
-        user_id: player_id, // placeholder until real user lookup
+        user_id: player_id,
         name: body.name.clone(),
         position: Vector2::new(0.0, 0.0),
         velocity: Vector2::zero(),
@@ -66,6 +74,7 @@ async fn join(
     };
 
     state.game.write().await.players.insert(player_id, player);
+    state.api_key_map.write().await.insert(key_hash, player_id);
 
     let event = serde_json::json!({
         "type": "player_joined",
@@ -97,11 +106,12 @@ enum DirectionBody {
 }
 
 async fn jump(
-    BotApiKey(_api_key): BotApiKey,
+    BotApiKey(api_key): BotApiKey,
     State(state): State<Arc<AppState>>,
     Json(body): Json<JumpRequest>,
 ) -> ApiResult<Json<serde_json::Value>> {
-    // TODO: resolve player_id from api_key
+    let key_hash = hash_api_key(&api_key);
+
     let direction = match body.direction {
         DirectionBody::Vector { x, y } => Vector2::new(x, y),
         DirectionBody::Angle { angle_deg } => {
@@ -109,7 +119,8 @@ async fn jump(
             Vector2::new(rad.cos(), rad.sin())
         }
     };
-    // Validate here so we can return 400 before acquiring the write lock.
+
+    // Validate before acquiring the write lock.
     if direction.normalize().is_none() {
         return Err(AppError::BadRequest("direction must not be a zero vector".into()));
     }
@@ -117,14 +128,16 @@ async fn jump(
         return Err(AppError::BadRequest("strength out of range".into()));
     }
 
-    // TODO: replace placeholder player_id with real lookup from api_key
-    // For now we skip the grounded check when no player is found (join not yet called).
-    {
-        let game = state.game.read().await;
-        // player_id is not yet resolved from api_key; check is a no-op until that TODO is done.
-        // When resolved, replace the block below with the real player_id.
-        let _ = &game.players; // placeholder reference
-    }
+    let player_id = {
+        let map = state.api_key_map.read().await;
+        *map.get(&key_hash).ok_or(AppError::BadRequest("not joined; call /bot/join first".into()))?
+    };
+
+    let mut game = state.game.write().await;
+    let player = game.players.get_mut(&player_id)
+        .ok_or_else(|| AppError::Internal(anyhow::anyhow!("player not found in game state")))?;
+
+    physics::apply_jump(player, direction, body.strength)?;
 
     Ok(Json(serde_json::json!({ "status": "ok" })))
 }
@@ -134,14 +147,28 @@ async fn jump(
 // ---------------------------------------------------------------------------
 
 async fn state(
-    BotApiKey(_api_key): BotApiKey,
+    BotApiKey(api_key): BotApiKey,
     State(app): State<Arc<AppState>>,
 ) -> ApiResult<Json<serde_json::Value>> {
-    // TODO: resolve player_id from api_key and return their SpatialState
+    let key_hash = hash_api_key(&api_key);
+
+    let player_id = {
+        let map = app.api_key_map.read().await;
+        *map.get(&key_hash).ok_or(AppError::BadRequest("not joined; call /bot/join first".into()))?
+    };
+
     let game = app.game.read().await;
+    let player = game.players.get(&player_id)
+        .ok_or_else(|| AppError::Internal(anyhow::anyhow!("player not found in game state")))?;
+
     Ok(Json(serde_json::json!({
         "tick": game.world.tick,
-        "player_count": game.players.len(),
+        "player_id": player_id,
+        "position": { "x": player.position.x, "y": player.position.y },
+        "velocity": { "x": player.velocity.x, "y": player.velocity.y },
+        "state": format!("{:?}", player.state),
+        "session_max_height": player.session_max_height,
+        "activity_rating": player.activity_rating,
     })))
 }
 
@@ -162,14 +189,24 @@ async fn statistics(
 // ---------------------------------------------------------------------------
 
 async fn leave(
-    BotApiKey(_api_key): BotApiKey,
+    BotApiKey(api_key): BotApiKey,
     State(state): State<Arc<AppState>>,
 ) -> ApiResult<Json<serde_json::Value>> {
-    // TODO: resolve player_id from api_key, remove from game state, persist session
+    let key_hash = hash_api_key(&api_key);
+
+    let player_id = {
+        let mut map = state.api_key_map.write().await;
+        map.remove(&key_hash).ok_or(AppError::BadRequest("not joined; call /bot/join first".into()))?
+    };
+
+    state.game.write().await.players.remove(&player_id);
+
     let event = serde_json::json!({
         "type": "player_left",
         "timestamp": Utc::now().timestamp_millis(),
+        "player_id": player_id,
     });
     state.broadcast(event.to_string());
+
     Ok(Json(serde_json::json!({ "status": "ok" })))
 }

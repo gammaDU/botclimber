@@ -33,6 +33,8 @@ async fn main() -> Result<()> {
 
     let state = Arc::new(AppState::new(cfg.clone(), db));
 
+    game::tick::spawn(state.clone());
+
     let app = api::router(state.clone());
 
     let bind_addr = cfg.server.bind.parse::<std::net::SocketAddr>()?;

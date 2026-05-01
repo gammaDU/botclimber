@@ -39,7 +39,7 @@ struct RegisterResponse {
 async fn register(
     State(state): State<Arc<AppState>>,
     Json(body): Json<RegisterRequest>,
-) -> ApiResult<Json<RegisterResponse>> {
+) -> ApiResult<(StatusCode, Json<RegisterResponse>)> {
     use argon2::{Argon2, PasswordHasher, password_hash::{SaltString, rand_core::OsRng}};
 
     let password_hash = {
@@ -63,7 +63,7 @@ async fn register(
         .create_user(&id_str, &username, &password_hash, &api_key_hash, &now)
         .map_err(|_| AppError::Conflict("username already taken".into()))?;
 
-    Ok(Json(RegisterResponse { user_id }))
+    Ok((StatusCode::CREATED, Json(RegisterResponse { user_id })))
 }
 
 // ---------------------------------------------------------------------------

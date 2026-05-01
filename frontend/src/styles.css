@@ -77,9 +77,10 @@ main { flex: 1; padding: 1.5rem; max-width: 1100px; margin: 0 auto; width: 100%;
   font-weight: 600;
 }
 
-.status-connected    { background: var(--success); color: #000; }
-.status-disconnected { background: var(--error);   color: #fff; }
-.status-connecting   { background: #f0a500;        color: #000; }
+.status-connected     { background: var(--success); color: #000; }
+.status-disconnected  { background: var(--error);   color: #fff; }
+.status-connecting    { background: #f0a500;        color: #000; }
+.status-reconnecting  { background: #f0a500;        color: #000; }
 
 #game-container {
   display: flex;

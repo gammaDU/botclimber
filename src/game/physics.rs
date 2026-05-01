@@ -15,6 +15,7 @@ pub const BOUNCE_SCHEDULE: &[f64] = &[1.0, 0.75, 0.50, 0.25, 0.0];
 
 pub const DEATH_DROP: f64 = 15.0;
 
+use crate::error::AppError;
 use crate::models::{Platform, PlayerState, Rect, Vector2};
 
 /// Apply one physics tick to a single player.
@@ -44,7 +45,9 @@ pub fn tick_player(player: &mut PlayerState, platforms: &[Platform]) -> bool {
             player.position.y = platform.rect.y + platform.rect.height;
             player.position.x = new_pos.x;
 
-            let bounce_idx = player.consecutive_bounces.min(BOUNCE_SCHEDULE.len() as u32 - 1) as usize;
+            let bounce_idx = player
+                .consecutive_bounces
+                .min(BOUNCE_SCHEDULE.len() as u32 - 1) as usize;
             let multiplier = BOUNCE_SCHEDULE[bounce_idx];
             player.velocity.y = player.velocity.y.abs() * multiplier;
             player.velocity.x *= multiplier;
@@ -59,7 +62,15 @@ pub fn tick_player(player: &mut PlayerState, platforms: &[Platform]) -> bool {
 
     if !landed {
         player.position = new_pos;
-        player.state = crate::models::PlayerMovementState::Jumping;
+    }
+
+    // Floor clamp: a bot can never drop below y = 0
+    if player.position.y < 0.0 {
+        player.position.y = 0.0;
+        if player.velocity.y < 0.0 {
+            player.velocity.y = 0.0;
+        }
+        player.state = crate::models::PlayerMovementState::Landed;
     }
 
     // Update session max height
@@ -78,26 +89,28 @@ pub fn apply_jump(
     player: &mut PlayerState,
     direction: Vector2,
     strength: f64,
-) -> Result<(), &'static str> {
+) -> Result<(), AppError> {
     if strength < JUMP_STRENGTH_MIN || strength > JUMP_STRENGTH_MAX {
-        return Err("strength out of range");
+        return Err(AppError::BadRequest("strength out of range".into()));
     }
-    let unit = direction.normalize().ok_or("direction must not be a zero vector")?;
+    if player.state == crate::models::PlayerMovementState::Jumping {
+        return Err(AppError::Conflict("player is already jumping".into()));
+    }
+    let unit = direction.normalize().ok_or(AppError::BadRequest(
+        "direction must not be a zero vector".into(),
+    ))?;
     player.velocity = Vector2 {
         x: unit.x * strength,
         y: unit.y * strength,
     };
     player.state = crate::models::PlayerMovementState::Jumping;
-    player.consecutive_bounces += 1;
+    player.consecutive_bounces = 0;
     Ok(())
 }
 
 /// Axis-aligned bounding box overlap test.
 pub fn aabb_overlap(a: &Rect, b: &Rect) -> bool {
-    a.x < b.x + b.width
-        && a.x + a.width > b.x
-        && a.y < b.y + b.height
-        && a.y + a.height > b.y
+    a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y
 }
 
 #[cfg(test)]
@@ -126,7 +139,12 @@ mod tests {
     fn make_platform(x: f64, y: f64, w: f64, h: f64) -> Platform {
         Platform {
             id: Uuid::new_v4(),
-            rect: Rect { x, y, width: w, height: h },
+            rect: Rect {
+                x,
+                y,
+                width: w,
+                height: h,
+            },
         }
     }
 
@@ -143,7 +161,10 @@ mod tests {
         // (3, 4) has length 5 — not a unit vector
         apply_jump(&mut p, Vector2::new(3.0, 4.0), 10.0).unwrap();
         let speed = p.velocity.length();
-        assert!((speed - 10.0).abs() < 1e-9, "speed should equal strength after normalisation");
+        assert!(
+            (speed - 10.0).abs() < 1e-9,
+            "speed should equal strength after normalisation"
+        );
     }
 
     #[test]
@@ -186,15 +207,35 @@ mod tests {
 
     #[test]
     fn aabb_overlap_detects_intersection() {
-        let a = Rect { x: 0.0, y: 0.0, width: 2.0, height: 2.0 };
-        let b = Rect { x: 1.0, y: 1.0, width: 2.0, height: 2.0 };
+        let a = Rect {
+            x: 0.0,
+            y: 0.0,
+            width: 2.0,
+            height: 2.0,
+        };
+        let b = Rect {
+            x: 1.0,
+            y: 1.0,
+            width: 2.0,
+            height: 2.0,
+        };
         assert!(aabb_overlap(&a, &b));
     }
 
     #[test]
     fn aabb_no_overlap_adjacent() {
-        let a = Rect { x: 0.0, y: 0.0, width: 1.0, height: 1.0 };
-        let b = Rect { x: 1.0, y: 0.0, width: 1.0, height: 1.0 };
+        let a = Rect {
+            x: 0.0,
+            y: 0.0,
+            width: 1.0,
+            height: 1.0,
+        };
+        let b = Rect {
+            x: 1.0,
+            y: 0.0,
+            width: 1.0,
+            height: 1.0,
+        };
         assert!(!aabb_overlap(&a, &b));
     }
 }

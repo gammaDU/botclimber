@@ -11,6 +11,10 @@ path = "src/main.rs"
 name = "migrate"
 path = "migrations/migrate.rs"
 
+[[bin]]
+name = "example-bot"
+path = "src/bin/example_bot.rs"
+
 [dependencies]
 # Async runtime
 tokio = { version = "1", features = ["full"] }
@@ -44,6 +48,9 @@ config = "0.14"
 governor = "0.8"
 futures-util = "0.3"
 dashmap = "6"
+
+# HTTP client (used by example-bot binary)
+reqwest = { version = "0.12", features = ["json"] }
 
 # Utilities
 uuid = { version = "1", features = ["v4", "serde"] }

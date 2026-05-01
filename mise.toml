@@ -25,6 +25,10 @@ depends = ["frontend-build"]
 description = "Run Clippy linter"
 run = "cargo clippy -- -D warnings"
 
+[tasks.example-bot]
+description = "Run the example bot (jumps every 5 seconds)"
+run = "cargo run --bin example-bot"
+
 [tasks.frontend-dev]
 description = "Start the Angular dev server with API proxy (http://localhost:4200)"
 dir = "frontend"
