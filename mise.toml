@@ -12,6 +12,19 @@ dir = "frontend"
 run = "npm run build"
 depends = ["frontend-install"]
 
+[tasks.migrate]
+description = "Run database migrations"
+run = "cargo run --bin migrate -- botclimber.db"
+
+[tasks.serve]
+description = "Start the backend server"
+run = "cargo run"
+depends = ["frontend-build"]
+
+[tasks.clippy]
+description = "Run Clippy linter"
+run = "cargo clippy -- -D warnings"
+
 [tasks.frontend-dev]
 description = "Start the Angular dev server with API proxy (http://localhost:4200)"
 dir = "frontend"
