@@ -40,23 +40,26 @@ pub fn tick_player(player: &mut PlayerState, platforms: &[Platform]) -> bool {
 
     let mut landed = false;
     for platform in platforms {
-        if aabb_overlap(&player_rect, &platform.rect) && player.velocity.y < 0.0 {
-            // Land on top of platform
-            player.position.y = platform.rect.y + platform.rect.height;
-            player.position.x = new_pos.x;
+        if let Some(side) = aabb_overlap(&platform.rect, &player_rect) {
+            match side {
+                OverlapSide::Top | OverlapSide::Bottom => {
+                    player.velocity.y *= -1.0;
+                }
+                OverlapSide::Left | OverlapSide::Right => {
+                    player.velocity.x *= -1.0;
+                }
+            }
 
-            let bounce_idx = player
-                .consecutive_bounces
-                .min(BOUNCE_SCHEDULE.len() as u32 - 1) as usize;
-            let multiplier = BOUNCE_SCHEDULE[bounce_idx];
-            player.velocity.y = player.velocity.y.abs() * multiplier;
-            player.velocity.x *= multiplier;
+            if side == OverlapSide::Top && player.velocity.y < 0.0 {
+                player.position.y = platform.rect.y + platform.rect.height;
+                player.position.x = new_pos.x;
 
-            player.state = crate::models::PlayerMovementState::Landed;
-            player.last_landed_position = player.position;
-            player.consecutive_bounces = 0;
-            landed = true;
-            break;
+                player.state = crate::models::PlayerMovementState::Landed;
+                player.last_landed_position = player.position;
+                player.consecutive_bounces = 0;
+                landed = true;
+                break;
+            }
         }
     }
 
@@ -71,6 +74,7 @@ pub fn tick_player(player: &mut PlayerState, platforms: &[Platform]) -> bool {
             player.velocity.y = 0.0;
         }
         player.state = crate::models::PlayerMovementState::Landed;
+        player.consecutive_bounces = 0;
     }
 
     // Update session max height
@@ -94,7 +98,7 @@ pub fn apply_jump(
         return Err(AppError::BadRequest("strength out of range".into()));
     }
     if player.state == crate::models::PlayerMovementState::Jumping {
-        return Err(AppError::Conflict("player is already jumping".into()));
+        return Err(AppError::Conflict("not_landed".into()));
     }
     let unit = direction.normalize().ok_or(AppError::BadRequest(
         "direction must not be a zero vector".into(),
@@ -104,13 +108,44 @@ pub fn apply_jump(
         y: unit.y * strength,
     };
     player.state = crate::models::PlayerMovementState::Jumping;
-    player.consecutive_bounces = 0;
     Ok(())
 }
 
+/// Which side of rectangle `a` overlaps rectangle `b`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OverlapSide {
+    Top,
+    Bottom,
+    Left,
+    Right,
+}
+
 /// Axis-aligned bounding box overlap test.
-pub fn aabb_overlap(a: &Rect, b: &Rect) -> bool {
-    a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y
+/// Returns the side of `a` through which the smallest penetration occurs,
+/// or `None` if the rectangles do not overlap.
+pub fn aabb_overlap(a: &Rect, b: &Rect) -> Option<OverlapSide> {
+    let overlap_x = (a.x + a.width).min(b.x + b.width) - a.x.max(b.x);
+    let overlap_y = (a.y + a.height).min(b.y + b.height) - a.y.max(b.y);
+
+    if overlap_x <= 0.0 || overlap_y <= 0.0 {
+        return None;
+    }
+
+    if overlap_x < overlap_y {
+        // Horizontal axis has smaller penetration
+        if a.x + a.width / 2.0 < b.x + b.width / 2.0 {
+            Some(OverlapSide::Right)
+        } else {
+            Some(OverlapSide::Left)
+        }
+    } else {
+        // Vertical axis has smaller penetration
+        if a.y + a.height / 2.0 < b.y + b.height / 2.0 {
+            Some(OverlapSide::Top)
+        } else {
+            Some(OverlapSide::Bottom)
+        }
+    }
 }
 
 #[cfg(test)]
@@ -219,7 +254,7 @@ mod tests {
             width: 2.0,
             height: 2.0,
         };
-        assert!(aabb_overlap(&a, &b));
+        assert_eq!(aabb_overlap(&a, &b), Some(OverlapSide::Top));
     }
 
     #[test]
@@ -236,6 +271,6 @@ mod tests {
             width: 1.0,
             height: 1.0,
         };
-        assert!(!aabb_overlap(&a, &b));
+        assert_eq!(aabb_overlap(&a, &b), None);
     }
 }

@@ -3,6 +3,7 @@ use std::sync::Arc;
 use axum::{
     Json, Router,
     extract::State,
+    http::StatusCode,
     routing::{get, post},
 };
 use chrono::Utc;
@@ -37,6 +38,8 @@ struct JoinRequest {
 struct JoinResponse {
     player_id: Uuid,
     session_id: Uuid,
+    spawn_point: Vector2,
+    state: String,
 }
 
 async fn join(
@@ -50,7 +53,7 @@ async fn join(
     {
         let map = state.api_key_map.read().await;
         if map.contains_key(&key_hash) {
-            return Err(AppError::BadRequest("already joined the current session".into()));
+            return Err(AppError::Conflict("already_joined".into()));
         }
     }
 
@@ -84,7 +87,8 @@ async fn join(
     });
     state.broadcast(event.to_string());
 
-    Ok(Json(JoinResponse { player_id, session_id }))
+    let spawn_point = Vector2::new(0.0, 0.0);
+    Ok(Json(JoinResponse { player_id, session_id, spawn_point, state: "JUMPING".to_string() }))
 }
 
 // ---------------------------------------------------------------------------
@@ -97,7 +101,7 @@ struct JumpRequest {
     strength: f64,
 }
 
-/// Accepts either a vector `{"x": .., "y": ..}` or an angle `{"angle_deg": ..}` (0=right, CCW).
+/// Accepts either a vector `{"x": .., "y": ..}` or an angle `{"angle_deg": ..}` (0=straight up, CW).
 #[derive(Deserialize)]
 #[serde(untagged)]
 enum DirectionBody {
@@ -116,7 +120,8 @@ async fn jump(
         DirectionBody::Vector { x, y } => Vector2::new(x, y),
         DirectionBody::Angle { angle_deg } => {
             let rad = angle_deg.to_radians();
-            Vector2::new(rad.cos(), rad.sin())
+            // 0° = straight up: x = sin(rad), y = cos(rad)
+            Vector2::new(rad.sin(), rad.cos())
         }
     };
 
@@ -130,7 +135,7 @@ async fn jump(
 
     let player_id = {
         let map = state.api_key_map.read().await;
-        *map.get(&key_hash).ok_or(AppError::BadRequest("not joined; call /bot/join first".into()))?
+        *map.get(&key_hash).ok_or(AppError::Conflict("not_joined".into()))?
     };
 
     let mut game = state.game.write().await;
@@ -161,14 +166,19 @@ async fn state(
     let player = game.players.get(&player_id)
         .ok_or_else(|| AppError::Internal(anyhow::anyhow!("player not found in game state")))?;
 
+    let surrounding_platforms: Vec<_> = game.world.platforms.iter()
+        .map(|p| serde_json::json!({ "id": p.id, "rect": { "x": p.rect.x, "y": p.rect.y, "width": p.rect.width, "height": p.rect.height } }))
+        .collect();
+
     Ok(Json(serde_json::json!({
-        "tick": game.world.tick,
-        "player_id": player_id,
+        "session_id": player.session_id,
         "position": { "x": player.position.x, "y": player.position.y },
         "velocity": { "x": player.velocity.x, "y": player.velocity.y },
-        "state": format!("{:?}", player.state),
+        "dimensions": { "x": crate::game::physics::PLAYER_WIDTH, "y": crate::game::physics::PLAYER_HEIGHT },
         "session_max_height": player.session_max_height,
-        "activity_rating": player.activity_rating,
+        "state": format!("{:?}", player.state),
+        "consecutive_bounces": player.consecutive_bounces,
+        "surrounding_platforms": surrounding_platforms,
     })))
 }
 
@@ -191,12 +201,12 @@ async fn statistics(
 async fn leave(
     BotApiKey(api_key): BotApiKey,
     State(state): State<Arc<AppState>>,
-) -> ApiResult<Json<serde_json::Value>> {
+) -> ApiResult<StatusCode> {
     let key_hash = hash_api_key(&api_key);
 
     let player_id = {
         let mut map = state.api_key_map.write().await;
-        map.remove(&key_hash).ok_or(AppError::BadRequest("not joined; call /bot/join first".into()))?
+        map.remove(&key_hash).ok_or(AppError::Conflict("not_joined".into()))?
     };
 
     state.game.write().await.players.remove(&player_id);
@@ -208,5 +218,5 @@ async fn leave(
     });
     state.broadcast(event.to_string());
 
-    Ok(Json(serde_json::json!({ "status": "ok" })))
+    Ok(StatusCode::NO_CONTENT)
 }

@@ -136,7 +136,7 @@ async fn main() -> Result<()> {
             .post(format!("{base_url}/api/v1/bot/jump"))
             .header("X-API-Key", &api_key)
             .json(&serde_json::json!({
-                "direction": { "x": 0.0, "y": 1.0 },
+                "direction": { "angle_deg": -45 },
                 "strength": 10.0
             }))
             .send()

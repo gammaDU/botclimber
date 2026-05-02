@@ -201,6 +201,7 @@ export class SpectateComponent implements OnInit, AfterViewInit, OnDestroy {
         }
         this.eventBuffer = [];
         this.ready = true;
+        this.status = 'connected';
       },
       error: () => {
         // Retry snapshot after a short delay
@@ -217,7 +218,7 @@ export class SpectateComponent implements OnInit, AfterViewInit, OnDestroy {
   // ---------------------------------------------------------------------------
 
   private _onEvent(e: WsEnvelope): void {
-    if (!this.ready) {
+    if (this.status !== 'connected') {
       this.eventBuffer.push(e);
     } else {
       this._applyEvent(e);
