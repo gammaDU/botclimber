@@ -191,7 +191,6 @@ mod tests {
             position: Vector2::new(0.0, 5.0),
             velocity: Vector2::zero(),
             state: crate::models::PlayerMovementState::Jumping,
-            consecutive_bounces: 0,
             session_max_height: 5.0,
             activity_rating: 0.0,
             last_heartbeat: Utc::now(),
@@ -255,7 +254,6 @@ mod tests {
         // First landing: multiplier = 1.0 (100 %)
         tick_player(&mut p, &[platform.clone()]);
         assert_eq!(p.state, crate::models::PlayerMovementState::Landed);
-        assert_eq!(p.consecutive_bounces, 0);
     }
 
     #[test]

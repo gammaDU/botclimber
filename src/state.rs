@@ -96,7 +96,6 @@ impl AppState {
                 "vx": velocity.x,
                 "vy": velocity.y,
                 "state": format!("{:?}", state).to_uppercase(),
-                "consecutive_bounces": 0,
             }
         });
         self.broadcast(BroadcastType::PositionUpdate, event.to_string());

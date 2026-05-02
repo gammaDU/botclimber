@@ -73,7 +73,6 @@ Emitted whenever one or more players' positions or states change (on every physi
     "vx": 0.0,
     "vy": -4.2,
     "state": "JUMPING",
-    "consecutive_bounces": 2
   }
 }
 ```
@@ -86,7 +85,6 @@ Emitted whenever one or more players' positions or states change (on every physi
 | `vx` | `number` | Current horizontal velocity (world units/tick) |
 | `vy` | `number` | Current vertical velocity (world units/tick) |
 | `state` | `"LANDED"` \| `"JUMPING"` | Current movement state (see [game_rules.md](../game_rules.md)) |
-| `consecutive_bounces` | `integer` | Number of consecutive wall/ceiling bounces since last landing |
 
 ### 3.2 `platform_spawn`
 

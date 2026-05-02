@@ -19,20 +19,15 @@ This document provides the technical specifications for the Botclimber game engi
 - **Direction**:
     - Expressed as a vector `(x, y)` or an angle in degrees (`0` to `360`).
     - If a vector is supplied that is not a unit vector, the server **normalizes it automatically** and accepts the request (no error is returned).
-    - `90°` or `(0, 1)` is straight up.
-- **Air Resistance**: Currently `0.0` (vacuum physics).
+    - `0°` or `(0, 1)` is straight up.
+- **Air Resistance**: Currently `1.0` (no air resistance applied per tick).
 
 ## 3. Player Figures
 - **Dimensions**: Each player is represented as an Axis-Aligned Bounding Box (AABB) with a width of `0.8 units` and a height of `0.8 units`.
 - **Collisions**: 
     - **Environment**: Players collide with all surfaces of platforms (top, bottom, and sides) as well as the tower walls.
     - **Physics**: Collisions result in a **reflection** of the player's velocity vector relative to the surface normal of the surface hit (platform side or tower wall). 
-    - **Bounce Reduction**: Each consecutive reflection during a single flight (between a jump and landing) reduces the velocity.
-        - **1st Reflection**: 100% of velocity retained.
-        - **2nd Reflection**: 75% of velocity retained.
-        - **3rd Reflection**: 50% of velocity retained.
-        - **4th Reflection**: 25% of velocity retained.
-        - **5th and subsequent**: 0% (velocity set to 0, player begins to fall straight down if hit a side/bottom, or lands if hit a top surface with low velocity).
+    - **Bounce Reduction**: Every reflection applies a flat **friction factor of `0.5`** to the velocity components along the reflected axis. For top/bottom surface hits, both `v_x` and `v_y` are multiplied by `0.5` (with `v_y` sign-flipped). For side hits (left/right of platform or tower wall), only `v_x` is multiplied by `-0.5`.
     - **Players**: Players are "ghosts" relative to each other; they do not collide or block each other's movement.
 - **Landing**: A player is considered in the **LANDED** state if their vertical velocity is sufficiently low (e.g., `|v_y| < 0.1 units/s`) upon hitting a top surface. 
 - **Player States**:

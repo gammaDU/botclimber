@@ -452,7 +452,7 @@ paths:
           "data": { ... }
         }
         ```
-        - For `position_update`: `data` contains `player_id`, `x`, `y`, `vx`, `vy`, `state`, and `consecutive_bounces`.
+        - For `position_update`: `data` contains `player_id`, `x`, `y`, `vx`, `vy`, and `state`.
         - For `platform_spawn`: `data` contains `platform_id` and `rect`.
       responses:
         '101':
@@ -558,9 +558,6 @@ components:
         dimensions: { $ref: '#/components/schemas/Vector2' }
         session_max_height: { type: number }
         state: { type: string, enum: [LANDED, JUMPING], description: "The current state of the player figure. LANDED means the figure is stationary on a surface and ready to jump. JUMPING means the figure has non-zero velocity (in flight, falling, or bouncing)." }
-        consecutive_bounces:
-          type: integer
-          description: The number of times the player has bounced since the last jump.
         surrounding_platforms:
           type: array
           items:
@@ -637,7 +634,6 @@ components:
         velocity: { $ref: '#/components/schemas/Vector2' }
         dimensions: { $ref: '#/components/schemas/Vector2' }
         state: { type: string, enum: [LANDED, JUMPING] }
-        consecutive_bounces: { type: integer }
         current_height: { type: number }
 
     ActivePlayerEntry:

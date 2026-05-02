@@ -19,7 +19,6 @@ interface PlayerState {
   x: number; y: number;
   vx: number; vy: number;
   state: 'LANDED' | 'JUMPING';
-  consecutive_bounces: number;
 }
 
 interface SnapshotResponse {
@@ -193,7 +192,6 @@ export class SpectateComponent implements OnInit, AfterViewInit, OnDestroy {
             vx: p.velocity.x,
             vy: p.velocity.y,
             state: p.state as 'LANDED' | 'JUMPING',
-            consecutive_bounces: 0,
           });
         }
         this._syncPlayerList();
@@ -245,7 +243,6 @@ export class SpectateComponent implements OnInit, AfterViewInit, OnDestroy {
           vx: d['vx'] as number,
           vy: d['vy'] as number,
           state: d['state'] as 'LANDED' | 'JUMPING',
-          consecutive_bounces: d['consecutive_bounces'] as number,
         });
         break;
       }
@@ -265,7 +262,6 @@ export class SpectateComponent implements OnInit, AfterViewInit, OnDestroy {
             name: d['name'] as string,
             x: 0, y: 0, vx: 0, vy: 0,
             state: 'LANDED',
-            consecutive_bounces: 0,
           });
         }
         break;

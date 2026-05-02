@@ -58,25 +58,15 @@ The physics engine is the most critical and most testable component. All expecte
 | No false positive | Player AABB adjacent to but not overlapping a platform | No collision detected |
 | Corner case | Player AABB corner grazes platform corner | Collision resolved against the axis of least penetration |
 
-### 2.4 Bounce Deceleration Schedule
+### 2.4 Bounce Deceleration
 
-Each consecutive reflection within a single flight applies a velocity retention factor. The `consecutive_bounces` counter resets to `0` on every new jump.
-
-| Bounce # | Retention | Test: incoming speed | Expected outgoing speed |
-|---|---|---|---|
-| 1st | 100% | `10.0` | `10.0` |
-| 2nd | 75% | `10.0` | `7.5` |
-| 3rd | 50% | `10.0` | `5.0` |
-| 4th | 25% | `10.0` | `2.5` |
-| 5th+ | 0% | `10.0` | `0.0` (player falls straight down) |
-
-Additional cases:
+Each bounce applies a flat `FRICTION = 0.5` factor to the reflected velocity component.
 
 | Test Case | Setup | Expected Result |
 |---|---|---|
-| Counter resets on jump | Player bounces twice, lands, then jumps again | `consecutive_bounces` resets to `0`; next bounce retains 100% |
-| Zero-velocity after 5th bounce (side hit) | Player hits a side surface on the 5th bounce | `v_x = 0`, `v_y = 0`; player enters free-fall |
-| Zero-velocity after 5th bounce (top hit) | Player hits a top surface on the 5th bounce with low `v_y` | Player transitions to `LANDED` state |
+| Side bounce | Player hits a wall with `v_x = 10.0` | `v_x` reflected and multiplied by `0.5`; outgoing `|v_x| = 5.0` |
+| Top/bottom bounce | Player hits a platform underside with `v_y = 10.0` | `v_y` reflected and multiplied by `0.5`; outgoing `|v_y| = 5.0` |
+| Soft landing | Player hits top surface with `|v_y| < 0.1` | Player transitions to `LANDED`; velocity set to `(0, 0)` |
 
 ### 2.5 State Transitions
 

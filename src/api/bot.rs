@@ -80,7 +80,6 @@ async fn join(
         position: Vector2::zero(),
         velocity: Vector2::zero(),
         state: crate::models::PlayerMovementState::Landed,
-        consecutive_bounces: 0,
         session_max_height: 0.0,
         activity_rating: 0.0,
         last_heartbeat: Utc::now(),
@@ -186,7 +185,6 @@ async fn state(
         "dimensions": { "x": crate::game::physics::PLAYER_WIDTH, "y": crate::game::physics::PLAYER_HEIGHT },
         "session_max_height": player.session_max_height,
         "state": format!("{:?}", player.state),
-        "consecutive_bounces": player.consecutive_bounces,
         "surrounding_platforms": surrounding_platforms,
     })))
 }

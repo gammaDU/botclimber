@@ -162,7 +162,6 @@ pub struct PlayerState {
     pub position: Vector2,
     pub velocity: Vector2,
     pub state: PlayerMovementState,
-    pub consecutive_bounces: u32,
     pub session_max_height: f64,
     /// Rolling activity score used by the director cam.
     pub activity_rating: f64,

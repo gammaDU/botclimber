@@ -40,7 +40,6 @@ pub fn spawn(state: Arc<AppState>) {
                     player.position = player.last_landed_position;
                     player.velocity = crate::models::Vector2::zero();
                     player.session_max_height = player.position.y;
-                    player.consecutive_bounces = 0;
                     player.state = crate::models::PlayerMovementState::Landed;
                 }
             }

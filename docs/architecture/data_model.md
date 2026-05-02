@@ -53,7 +53,6 @@ Represents the runtime state of an active bot in the game world.
 | `position` | Vector2 (x, y) | Current coordinates in the tower. |
 | `velocity` | Vector2 (vx, vy) | Current velocity vector. |
 | `state` | Enum | `LANDED`, `JUMPING`. |
-| `consecutive_bounces` | INTEGER | Number of bounces since the last jump. Used for velocity reduction. |
 | `last_landed_position` | Vector2 (x, y) | The last position where the player was in the `LANDED` state (for Checkpoint Mode). |
 | `session_max_height`| REAL | The highest point reached in the current session. |
 | `activity_rating` | REAL | Rolling activity score used by the director cam to prioritize which players to focus on. Higher values indicate more recent or frequent actions. |
