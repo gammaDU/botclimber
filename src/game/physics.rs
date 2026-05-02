@@ -15,8 +15,19 @@ pub const JUMP_STRENGTH_MAX: f64 = 20.0;
 
 pub const DEATH_DROP: f64 = 15.0;
 
+use thiserror::Error;
 use crate::error::AppError;
 use crate::models::{Platform, PlayerState, Rect, Vector2};
+
+#[derive(Error, Debug)]
+pub enum PhysicsError {
+    #[error("Invalid jump strength, must be between {JUMP_STRENGTH_MIN} and {JUMP_STRENGTH_MAX}")]
+    InvalidJumpStrength,
+    #[error("Jump direction can not be the null vector")]
+    InvalidJumpDirection,
+    #[error("Player is in the air")]
+    InvalidJumpState,
+}
 
 /// Apply one physics tick to a single player.
 /// Returns `true` if the player died (fell more than DEATH_DROP below session peak) and should be reset.
@@ -111,16 +122,14 @@ pub fn apply_jump(
     player: &mut PlayerState,
     direction: Vector2,
     strength: f64,
-) -> Result<(), AppError> {
+) -> Result<(), PhysicsError> {
     if strength < JUMP_STRENGTH_MIN || strength > JUMP_STRENGTH_MAX {
-        return Err(AppError::BadRequest("strength out of range".into()));
+        return Err(PhysicsError::InvalidJumpStrength);
     }
     if player.state == crate::models::PlayerMovementState::Jumping {
-        return Err(AppError::Conflict("not_landed".into()));
+        return Err(PhysicsError::InvalidJumpState);
     }
-    let unit = direction.normalize().ok_or(AppError::BadRequest(
-        "direction must not be a zero vector".into(),
-    ))?;
+    let unit = direction.normalize().ok_or(PhysicsError::InvalidJumpDirection)?;
     player.velocity = Vector2 {
         x: unit.x * strength,
         y: unit.y * strength,

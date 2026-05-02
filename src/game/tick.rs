@@ -23,7 +23,6 @@ pub fn spawn(state: Arc<AppState>) {
             game.world.tick = game.world.tick.wrapping_add(1);
 
             let platforms = game.world.platforms.clone();
-            let timestamp = Utc::now().to_rfc3339();
 
             let mut dead_players: Vec<uuid::Uuid> = Vec::new();
 
@@ -32,26 +31,7 @@ pub fn spawn(state: Arc<AppState>) {
                 if died {
                     dead_players.push(*player_id);
                 }
-
-                let event = json!({
-                    "type": "position_update",
-                    "timestamp": timestamp,
-                    "data": {
-                        "player_id": player_id.to_string(),
-                        "x": player.position.x,
-                        "y": player.position.y,
-                        "vx": player.velocity.x,
-                        "vy": player.velocity.y,
-                        "state": format!("{:?}", player.state).to_uppercase(),
-                        "consecutive_bounces": player.consecutive_bounces,
-                    }
-                });
-
-                if let Ok(json_str) = serde_json::to_string(&event) {
-                    state.broadcast(json_str);
-                } else {
-                    warn!("Failed to serialize position_update event");
-                }
+                state.broadcast_position_update(*player_id, player.position, player.velocity, player.state);
             }
 
             // Reset dead players to their last landed position

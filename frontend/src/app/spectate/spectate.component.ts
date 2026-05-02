@@ -52,12 +52,14 @@ const WORLD_SCALE = CANVAS_W / (TOWER_HALF_WIDTH * 2); // pixels per world unit 
   template: `
       <div class="view">
           <div id="status-bar">
-              <span id="connection-status" [class]="statusClass">{{ statusLabel }}</span>
-              <span style="color:var(--text-muted);font-size:0.85rem">
-          {{ playerList.length }} active player{{ playerList.length !== 1 ? 's' : '' }}
-        </span>
+              @if (status !== 'ready') {
+                  <span id="connection-status" [class]="statusClass">{{ statusLabel }}</span>
+              } @else {
+                  <span style="color:var(--text-muted);font-size:0.85rem">
+                    {{ playerList.length }} active player{{ playerList.length !== 1 ? 's' : '' }}
+                  </span>
+              }
           </div>
-
           <div id="game-container">
               <canvas #canvas id="game-canvas" [width]="canvasW" [height]="canvasH"></canvas>
 
@@ -78,8 +80,8 @@ const WORLD_SCALE = CANVAS_W / (TOWER_HALF_WIDTH * 2); // pixels per world unit 
                       <button [class.active]="followId === null" (click)="follow(null)">Free cam</button>
                       @if (followId) {
                           <span id="following-label">
-              Following: {{ followName }}
-            </span>
+                            Following: {{ followName }}
+                          </span>
                       }
                   </div>
               </div>
@@ -254,8 +256,10 @@ export class SpectateComponent implements OnInit, AfterViewInit, OnDestroy {
         break;
       }
       case 'player_joined': {
+        console.log(e, d);
         const id = d['player_id'] as string;
         if (!this.players.has(id)) {
+          console.log('player_joined', id);
           this.players.set(id, {
             player_id: id,
             name: d['name'] as string,
@@ -267,7 +271,9 @@ export class SpectateComponent implements OnInit, AfterViewInit, OnDestroy {
         break;
       }
       case 'player_left': {
+        console.log(e, d);
         const id = d['player_id'] as string;
+        console.log('player_left', id);
         this.players.delete(id);
         if (this.followId === id) this.followId = null;
         break;

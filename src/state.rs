@@ -1,12 +1,14 @@
+use std::cmp::PartialEq;
+use chrono::Utc;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::{broadcast, RwLock};
+use tokio::sync::{RwLock, broadcast};
 use uuid::Uuid;
 
 use crate::config::AppConfig;
 use crate::db::Database;
 use crate::game::world;
-use crate::models::{GameMode, State, WorldState};
+use crate::models::{GameMode, PlayerMovementState, State, Vector2, WorldState};
 
 /// Capacity of the broadcast channel for WebSocket events.
 const BROADCAST_CAPACITY: usize = 256;
@@ -54,9 +56,77 @@ impl AppState {
         }
     }
 
+    pub fn broadcast_player_joined(&self, player_id: Uuid, display_name: String) {
+        let event = serde_json::json!({
+            "type": "player_joined",
+            "timestamp": Utc::now().timestamp_millis(),
+            "data": {
+                "player_id": player_id.to_string(),
+                "name": display_name,
+            }
+        });
+        self.broadcast(BroadcastType::PlayerJoined, event.to_string());
+    }
+
+    pub fn broadcast_player_left(&self, player_id: Uuid) {
+        let event = serde_json::json!({
+            "type": "player_left",
+            "timestamp": Utc::now().timestamp_millis(),
+            "data" : {
+                "player_id": player_id,
+            }
+        });
+        self.broadcast(BroadcastType::PlayerLeft, event.to_string());
+    }
+
+    pub fn broadcast_position_update(
+        &self,
+        player_id: Uuid,
+        position: Vector2,
+        velocity: Vector2,
+        state: PlayerMovementState,
+    ) {
+        let event = serde_json::json!({
+            "type": "position_update",
+            "timestamp": Utc::now().timestamp_millis(),
+            "data": {
+                "player_id": player_id.to_string(),
+                "x": position.x,
+                "y": position.y,
+                "vx": velocity.x,
+                "vy": velocity.y,
+                "state": format!("{:?}", state).to_uppercase(),
+                "consecutive_bounces": 0,
+            }
+        });
+        self.broadcast(BroadcastType::PositionUpdate, event.to_string());
+    }
+
+    pub fn broadcast_world_reset(&self, mode: GameMode) {
+        let event = serde_json::json!({
+            "type": "world_reset",
+            "timestamp": Utc::now().timestamp_millis(),
+            "data": {
+                "game_mode": mode.to_string(),
+            },
+        });
+        self.broadcast(BroadcastType::WorldReset, event.to_string());
+    }
+
     /// Broadcast a JSON-serialised event string to all WebSocket subscribers.
     /// Silently ignores send errors (no active subscribers).
-    pub fn broadcast(&self, event_json: String) {
+    fn broadcast(&self, broadcast_type: BroadcastType,event_json: String) {
+        if broadcast_type != BroadcastType::PositionUpdate {
+            tracing::info!(event = %event_json, "ws_event");
+        }
         let _ = self.ws_tx.send(Arc::new(event_json));
     }
+}
+
+#[derive(PartialEq)]
+enum BroadcastType {
+    PlayerJoined,
+    PlayerLeft,
+    PositionUpdate,
+    WorldReset,
 }

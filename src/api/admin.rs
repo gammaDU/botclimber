@@ -43,12 +43,7 @@ async fn set_mode(
 
     state.game.write().await.game_mode = mode;
 
-    let event = serde_json::json!({
-        "type": "world_reset",
-        "timestamp": chrono::Utc::now().timestamp_millis(),
-        "game_mode": mode.to_string(),
-    });
-    state.broadcast(event.to_string());
+    state.broadcast_world_reset(mode);
 
     Ok(Json(serde_json::json!({ "game_mode": mode.to_string() })))
 }
@@ -89,11 +84,7 @@ async fn world_reset(
     game.world.seed = 0; // TODO: generate new seed on world reset
     game.players.clear();
 
-    let event = serde_json::json!({
-        "type": "world_reset",
-        "timestamp": chrono::Utc::now().timestamp_millis(),
-    });
-    state.broadcast(event.to_string());
+    state.broadcast_world_reset(game.game_mode);
 
     Ok(Json(serde_json::json!({ "status": "ok" })))
 }

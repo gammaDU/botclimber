@@ -17,12 +17,23 @@ use crate::state::AppState;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    tracing_subscriber::fmt()
-        .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "botclimber=debug,tower_http=debug".into()),
+    let file_appender = tracing_appender::rolling::daily("logs", "events.log");
+    let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
+
+    use tracing_subscriber::prelude::*;
+    let env_filter = tracing_subscriber::EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| "botclimber=debug,tower_http=debug".into());
+    tracing_subscriber::registry()
+        .with(tracing_subscriber::fmt::layer().with_filter(env_filter))
+        .with(
+            tracing_subscriber::fmt::layer()
+                .with_writer(non_blocking)
+                .with_ansi(false)
+                .with_filter(tracing_subscriber::EnvFilter::new("botclimber=info")),
         )
         .init();
+    // _guard must be kept alive for the duration of the program
+    let _appender_guard = _guard;
 
     let config_path = env::args().nth(1).unwrap_or_else(|| "server_config".to_string());
     let cfg = AppConfig::load(&config_path)?;

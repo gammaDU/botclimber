@@ -13,6 +13,7 @@ use uuid::Uuid;
 use crate::api::auth::{BotApiKey, hash_api_key};
 use crate::error::{ApiResult, AppError};
 use crate::game::physics;
+use crate::game::physics::PhysicsError;
 use crate::models::{PlayerState, Vector2};
 use crate::state::AppState;
 
@@ -62,12 +63,7 @@ async fn join(
         {
             game.players.remove(&old_player_id);
             api_map.remove(&old_key_hash);
-            let event = serde_json::json!({
-                "type": "player_left",
-                "timestamp": Utc::now().timestamp_millis(),
-                "player_id": old_player_id,
-            });
-            state.broadcast(event.to_string());
+            state.broadcast_player_left(old_player_id);
         }
     }
 
@@ -94,13 +90,7 @@ async fn join(
     state.game.write().await.players.insert(player_id, player);
     state.api_key_map.write().await.insert(key_hash, player_id);
 
-    let event = serde_json::json!({
-        "type": "player_joined",
-        "timestamp": Utc::now().timestamp_millis(),
-        "player_id": player_id,
-        "name": display_name,
-    });
-    state.broadcast(event.to_string());
+    state.broadcast_player_joined(player_id, display_name);
 
     Ok(Json(JoinResponse { player_id, session_id }))
 }
@@ -156,7 +146,12 @@ async fn jump(
     let player = game.players.get_mut(&player_id)
         .ok_or_else(|| AppError::Internal(anyhow::anyhow!("player not found in game state")))?;
 
-    physics::apply_jump(player, direction, body.strength)?;
+    match physics::apply_jump(player, direction, body.strength) {
+        Ok(_) => (),
+        Err(PhysicsError::InvalidJumpState) => return Err(AppError::Conflict("not_landed".into())),
+        Err(PhysicsError::InvalidJumpDirection) => return Err(AppError::BadRequest("invalid direction".into())),
+        Err(PhysicsError::InvalidJumpStrength) => return Err(AppError::BadRequest("invalid strength".into())),
+    }
 
     Ok(Json(serde_json::json!({ "status": "ok" })))
 }
@@ -225,12 +220,7 @@ async fn leave(
 
     state.game.write().await.players.remove(&player_id);
 
-    let event = serde_json::json!({
-        "type": "player_left",
-        "timestamp": Utc::now().timestamp_millis(),
-        "player_id": player_id,
-    });
-    state.broadcast(event.to_string());
+    state.broadcast_player_left(player_id);
 
     Ok(StatusCode::NO_CONTENT)
 }
