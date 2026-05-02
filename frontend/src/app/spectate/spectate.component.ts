@@ -1,5 +1,6 @@
 import {
-  Component, OnInit, OnDestroy, ElementRef, ViewChild, AfterViewInit, Input, ChangeDetectionStrategy,
+  Component, OnInit, OnDestroy, ElementRef, ViewChild, AfterViewInit, Input,
+  ChangeDetectionStrategy, ChangeDetectorRef,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
@@ -92,25 +93,22 @@ export class SpectateComponent implements OnInit, AfterViewInit, OnDestroy {
   readonly canvasW = CANVAS_W;
   readonly canvasH = CANVAS_H;
 
-  /** True once snapshot has been applied and buffered events replayed. */
-  ready = false;
-
   followId: string | null = null;
 
-  @Input() status: 'connecting' | 'connected' | 'reconnecting' | 'disconnected' = 'connecting';
+  status: 'connecting' | 'connected' | 'loading' | 'ready' | 'reconnecting' | 'disconnected' = 'connecting';
 
-  // Derived list for the sidebar
-  get playerList(): PlayerState[] {
-    return Array.from(this.players.values()).sort((a, b) => b.y - a.y);
-  }
+  playerList: PlayerState[] = [];
 
   private platforms = new Map<string, Platform>();
   private players = new Map<string, PlayerState>();
 
+  private _syncPlayerList(): void {
+    this.playerList = Array.from(this.players.values()).sort((a, b) => b.y - a.y);
+  }
+
   /** Events buffered before the snapshot arrives. */
   private eventBuffer: WsEnvelope[] = [];
   private snapshotTimestamp = 0;
-  private snapshotFetched = false;
 
   private camY = 0;
   private subs = new Subscription();
@@ -120,6 +118,7 @@ export class SpectateComponent implements OnInit, AfterViewInit, OnDestroy {
   constructor(
     private stream: GameStreamService,
     private http: HttpClient,
+    private cdr: ChangeDetectorRef,
   ) {}
 
   get statusClass(): string { return `status-${this.status}`; }
@@ -134,16 +133,16 @@ export class SpectateComponent implements OnInit, AfterViewInit, OnDestroy {
 
   ngOnInit(): void {
     this.subs.add(this.stream.status$.subscribe(s => {
-      this.status = s;
       if (s === 'reconnecting') {
         // Reset bootstrap state so we redo it on reconnect
-        this.ready = false;
-        this.snapshotFetched = false;
+        this.status = 'reconnecting';
         this.eventBuffer = [];
-      }
-      if (s === 'connected' && !this.snapshotFetched) {
+      } else if (s === 'connected' && this.status !== 'loading' && this.status !== 'ready') {
         this._fetchSnapshot();
+      } else if (s !== 'connected') {
+        this.status = s;
       }
+      this.cdr.markForCheck();
     }));
 
     this.subs.add(this.stream.events$.subscribe(e => this._onEvent(e)));
@@ -171,7 +170,8 @@ export class SpectateComponent implements OnInit, AfterViewInit, OnDestroy {
   // ---------------------------------------------------------------------------
 
   private _fetchSnapshot(): void {
-    this.snapshotFetched = true;
+    this.status = 'loading';
+    this.cdr.markForCheck();
     this.http.get<SnapshotResponse>('/api/v1/system/snapshot').subscribe({
       next: snap => {
         this.snapshotTimestamp = snap.timestamp;
@@ -194,6 +194,7 @@ export class SpectateComponent implements OnInit, AfterViewInit, OnDestroy {
             consecutive_bounces: 0,
           });
         }
+        this._syncPlayerList();
 
         // Replay buffered events that arrived after the snapshot
         for (const e of this.eventBuffer) {
@@ -202,12 +203,13 @@ export class SpectateComponent implements OnInit, AfterViewInit, OnDestroy {
           }
         }
         this.eventBuffer = [];
-        this.ready = true;
-        this.status = 'connected';
+        this.status = 'ready';
+        this.cdr.markForCheck();
       },
       error: () => {
         // Retry snapshot after a short delay
-        this.snapshotFetched = false;
+        this.status = 'connected';
+        this.cdr.markForCheck();
         setTimeout(() => {
           if (this.status === 'connected') this._fetchSnapshot();
         }, 2000);
@@ -220,7 +222,7 @@ export class SpectateComponent implements OnInit, AfterViewInit, OnDestroy {
   // ---------------------------------------------------------------------------
 
   private _onEvent(e: WsEnvelope): void {
-    if (this.status !== 'connected') {
+    if (this.status !== 'ready') {
       this.eventBuffer.push(e);
     } else {
       this._applyEvent(e);
@@ -273,13 +275,14 @@ export class SpectateComponent implements OnInit, AfterViewInit, OnDestroy {
       case 'world_reset': {
         this.players.clear();
         this.platforms.clear();
-        this.ready = false;
-        this.snapshotFetched = false;
+        this.status = 'connected';
         this.eventBuffer = [];
-        if (this.status === 'connected') this._fetchSnapshot();
+        this._fetchSnapshot();
         break;
       }
     }
+    this._syncPlayerList();
+    this.cdr.markForCheck();
   }
 
   // ---------------------------------------------------------------------------
@@ -299,7 +302,7 @@ export class SpectateComponent implements OnInit, AfterViewInit, OnDestroy {
     ctx.fillStyle = '#111122';
     ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
 
-    if (!this.ready) return;
+    if (this.status !== 'ready') return;
 
     // Update camera
     if (this.followId) {
