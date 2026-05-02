@@ -1,5 +1,5 @@
 import {
-  Component, OnInit, OnDestroy, ElementRef, ViewChild, AfterViewInit,
+  Component, OnInit, OnDestroy, ElementRef, ViewChild, AfterViewInit, Input, ChangeDetectionStrategy,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
@@ -40,48 +40,50 @@ interface SnapshotResponse {
 
 const CANVAS_W = 640;
 const CANVAS_H = 480;
-const WORLD_SCALE = 40; // pixels per world unit
+const TOWER_HALF_WIDTH = 10;  // world units, tower spans [-10, 10]
+const WORLD_SCALE = CANVAS_W / (TOWER_HALF_WIDTH * 2); // pixels per world unit — fits full tower width
 
 @Component({
   selector: 'app-spectate',
   standalone: true,
   imports: [CommonModule],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="view">
-      <div id="status-bar">
-        <span id="connection-status" [class]="statusClass">{{ statusLabel }}</span>
-        <span style="color:var(--text-muted);font-size:0.85rem">
+      <div class="view">
+          <div id="status-bar">
+              <span id="connection-status" [class]="statusClass">{{ statusLabel }}</span>
+              <span style="color:var(--text-muted);font-size:0.85rem">
           {{ playerList.length }} active player{{ playerList.length !== 1 ? 's' : '' }}
         </span>
-      </div>
+          </div>
 
-      <div id="game-container">
-        <canvas #canvas id="game-canvas" [width]="canvasW" [height]="canvasH"></canvas>
+          <div id="game-container">
+              <canvas #canvas id="game-canvas" [width]="canvasW" [height]="canvasH"></canvas>
 
-        <div id="session-panel">
-          <h2>Active Players</h2>
-          <ul id="session-list">
-            <li
-              *ngFor="let p of playerList"
-              [class.following]="followId === p.player_id"
-              (click)="follow(p.player_id)"
-              style="cursor:pointer"
-            >
-              <span>{{ p.name }}</span>
-              <span>{{ p.y | number:'1.1-1' }} m</span>
-            </li>
-            <li *ngIf="playerList.length === 0" style="color:var(--text-muted)">No active players</li>
-          </ul>
+              <div id="session-panel">
+                  <h2>Active Players</h2>
+                  <ul id="session-list">
+                      @for (p of playerList; track p.player_id) {
+                          <li [class.following]="followId === p.player_id" (click)="follow(p.player_id)">
+                              <span>{{ p.name }}</span>
+                              <span>{{ p.y | number:'1.1-1' }} m</span>
+                          </li>
+                      } @empty {
+                          <li style="color:var(--text-muted)">No active players</li>
+                      }
+                  </ul>
 
-          <div id="cam-controls">
-            <button [class.active]="followId === null" (click)="follow(null)">Free cam</button>
-            <span id="following-label" *ngIf="followId">
+                  <div id="cam-controls">
+                      <button [class.active]="followId === null" (click)="follow(null)">Free cam</button>
+                      @if (followId) {
+                          <span id="following-label">
               Following: {{ followName }}
             </span>
+                      }
+                  </div>
+              </div>
           </div>
-        </div>
       </div>
-    </div>
   `,
 })
 export class SpectateComponent implements OnInit, AfterViewInit, OnDestroy {
@@ -95,11 +97,11 @@ export class SpectateComponent implements OnInit, AfterViewInit, OnDestroy {
 
   followId: string | null = null;
 
-  status: 'connecting' | 'connected' | 'reconnecting' | 'disconnected' = 'connecting';
+  @Input() status: 'connecting' | 'connected' | 'reconnecting' | 'disconnected' = 'connecting';
 
   // Derived list for the sidebar
   get playerList(): PlayerState[] {
-    return Array.from(this.players.values());
+    return Array.from(this.players.values()).sort((a, b) => b.y - a.y);
   }
 
   private platforms = new Map<string, Platform>();

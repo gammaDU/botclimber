@@ -47,7 +47,7 @@ impl Database {
     pub fn find_user_by_username(&self, username: &str) -> Result<Option<UserRow>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
-            "SELECT id, username, password_hash, api_key_hash, created_at
+            "SELECT id, username, password_hash, api_key_hash, created_at, display_name
              FROM users WHERE username = ?1",
         )?;
         let mut rows = stmt.query(params![username])?;
@@ -58,6 +58,7 @@ impl Database {
                 password_hash: row.get(2)?,
                 api_key_hash: row.get(3)?,
                 created_at: row.get(4)?,
+                display_name: row.get(5)?,
             }))
         } else {
             Ok(None)
@@ -67,7 +68,7 @@ impl Database {
     pub fn find_user_by_api_key_hash(&self, hash: &str) -> Result<Option<UserRow>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
-            "SELECT id, username, password_hash, api_key_hash, created_at
+            "SELECT id, username, password_hash, api_key_hash, created_at, display_name
              FROM users WHERE api_key_hash = ?1",
         )?;
         let mut rows = stmt.query(params![hash])?;
@@ -78,6 +79,7 @@ impl Database {
                 password_hash: row.get(2)?,
                 api_key_hash: row.get(3)?,
                 created_at: row.get(4)?,
+                display_name: row.get(5)?,
             }))
         } else {
             Ok(None)
@@ -202,6 +204,7 @@ pub struct UserRow {
     pub password_hash: String,
     pub api_key_hash: String,
     pub created_at: String,
+    pub display_name: Option<String>,
 }
 
 pub struct LeaderboardRow {

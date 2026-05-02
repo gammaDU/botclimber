@@ -3,15 +3,15 @@ pub const GRAVITY: f64 = -10.0;
 pub const TICK_RATE_HZ: f64 = 60.0;
 pub const DT: f64 = 1.0 / TICK_RATE_HZ;
 
+pub const TOWER_WIDTH: f64 = 20.0;
+pub const AIR_RESISTANCE: f64 = 1.0;
+pub const FRICTION: f64 = 0.5;
+
 pub const PLAYER_WIDTH: f64 = 0.8;
 pub const PLAYER_HEIGHT: f64 = 0.8;
 
 pub const JUMP_STRENGTH_MIN: f64 = 0.0;
 pub const JUMP_STRENGTH_MAX: f64 = 20.0;
-
-/// Bounce deceleration schedule: velocity multipliers applied on successive
-/// platform landings within the same jump (100 %, 75 %, 50 %, 25 %, 0 %).
-pub const BOUNCE_SCHEDULE: &[f64] = &[1.0, 0.75, 0.50, 0.25, 0.0];
 
 pub const DEATH_DROP: f64 = 15.0;
 
@@ -23,58 +23,76 @@ use crate::models::{Platform, PlayerState, Rect, Vector2};
 pub fn tick_player(player: &mut PlayerState, platforms: &[Platform]) -> bool {
     // Apply gravity
     player.velocity.y += GRAVITY * DT;
+    player.velocity *= AIR_RESISTANCE;
 
     // Integrate position
-    let new_pos = Vector2 {
-        x: player.position.x + player.velocity.x * DT,
-        y: player.position.y + player.velocity.y * DT,
-    };
+    player.position += (player.velocity * DT);
 
     // AABB collision with platforms
     let player_rect = Rect {
-        x: new_pos.x - PLAYER_WIDTH / 2.0,
-        y: new_pos.y,
+        x: player.position.x - PLAYER_WIDTH / 2.0,
+        y: player.position.y,
         width: PLAYER_WIDTH,
         height: PLAYER_HEIGHT,
     };
 
-    let mut landed = false;
+    let mut grounded = false;
     for platform in platforms {
         if let Some(side) = aabb_overlap(&platform.rect, &player_rect) {
+            //bounce
             match side {
                 OverlapSide::Top | OverlapSide::Bottom => {
-                    player.velocity.y *= -1.0;
+                    player.velocity.x *= FRICTION;
+                    player.velocity.y *= -FRICTION;
                 }
                 OverlapSide::Left | OverlapSide::Right => {
-                    player.velocity.x *= -1.0;
+                    player.velocity.x *= -FRICTION;
                 }
             }
-
-            if side == OverlapSide::Top && player.velocity.y < 0.0 {
+            //place outside boundry
+            match side {
+                OverlapSide::Top => {
+                    grounded = true;
+                    player.position.y = platform.rect.y + platform.rect.height;
+                }
+                OverlapSide::Bottom => {
+                    player.position.y = platform.rect.y - PLAYER_HEIGHT;
+                }
+                OverlapSide::Left => {
+                    player.position.x = platform.rect.x - PLAYER_WIDTH / 2.0;
+                }
+                OverlapSide::Right => {
+                    player.position.x = platform.rect.x + platform.rect.width + PLAYER_WIDTH / 2.0;
+                }
+            }
+            if side == OverlapSide::Top {
+                grounded = true;
                 player.position.y = platform.rect.y + platform.rect.height;
-                player.position.x = new_pos.x;
-
-                player.state = crate::models::PlayerMovementState::Landed;
-                player.last_landed_position = player.position;
-                player.consecutive_bounces = 0;
-                landed = true;
-                break;
             }
         }
     }
 
-    if !landed {
-        player.position = new_pos;
+    //bounce of tower walls
+    if player_rect.x < -TOWER_WIDTH / 2.0 || player_rect.x + player_rect.width > TOWER_WIDTH / 2.0 {
+        player.velocity.x *= -FRICTION;
+        player.position.x = player.position.x.clamp(
+            (-TOWER_WIDTH + PLAYER_WIDTH) / 2.0,
+            (TOWER_WIDTH - PLAYER_WIDTH) / 2.0,
+        );
     }
 
-    // Floor clamp: a bot can never drop below y = 0
-    if player.position.y < 0.0 {
+    //bounce of floor
+    if player_rect.y < 0.0 {
+        player.velocity.x *= FRICTION;
+        player.velocity.y *= -FRICTION;
         player.position.y = 0.0;
-        if player.velocity.y < 0.0 {
-            player.velocity.y = 0.0;
-        }
+        grounded = true;
+    }
+
+    //set state to "Landed" if (little to) no vertical movement
+    if grounded && player.velocity.y.abs() < 0.1 {
         player.state = crate::models::PlayerMovementState::Landed;
-        player.consecutive_bounces = 0;
+        player.velocity *= 0.0;
     }
 
     // Update session max height
@@ -158,6 +176,7 @@ mod tests {
     fn make_player() -> PlayerState {
         PlayerState {
             session_id: Uuid::new_v4(),
+            player_id: Uuid::new_v4(),
             user_id: Uuid::new_v4(),
             name: "test".into(),
             position: Vector2::new(0.0, 5.0),

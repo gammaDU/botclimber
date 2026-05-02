@@ -1,3 +1,4 @@
+use std::ops::{Add, AddAssign, Mul, MulAssign};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -25,6 +26,10 @@ impl Vector2 {
         (self.x * self.x + self.y * self.y).sqrt()
     }
 
+    pub fn scale(&self, scalar: f64) -> Self {
+        Self { x: self.x * scalar, y: self.y * scalar }
+    }
+
     /// Returns a unit vector, or None if the vector is zero-length.
     pub fn normalize(&self) -> Option<Self> {
         let len = self.length();
@@ -33,6 +38,34 @@ impl Vector2 {
         } else {
             Some(Self { x: self.x / len, y: self.y / len })
         }
+    }
+}
+
+impl Add for Vector2 {
+    type Output = Self;
+    fn add(self, rhs: Self) -> Self {
+        Self { x: self.x + rhs.x, y: self.y + rhs.y }
+    }
+}
+
+impl AddAssign for Vector2 {
+    fn add_assign(&mut self, rhs: Self) {
+        self.x += rhs.x;
+        self.y += rhs.y;
+    }
+}
+
+impl Mul<f64> for Vector2 {
+    type Output = Self;
+    fn mul(self, scalar: f64) -> Self {
+        Self { x: self.x * scalar, y: self.y * scalar }
+    }
+}
+
+impl MulAssign<f64> for Vector2 {
+    fn mul_assign(&mut self, scalar: f64) {
+        self.x *= scalar;
+        self.y *= scalar;
     }
 }
 
@@ -123,6 +156,7 @@ pub enum PlayerMovementState {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PlayerState {
     pub session_id: Uuid,
+    pub player_id: Uuid,
     pub user_id: Uuid,
     pub name: String,
     pub position: Vector2,
@@ -159,4 +193,106 @@ pub struct WorldState {
 pub struct Platform {
     pub id: Uuid,
     pub rect: Rect,
+}
+
+#[cfg(test)]
+mod vector2_tests {
+    use super::Vector2;
+
+    #[test]
+    fn new_sets_components() {
+        let v = Vector2::new(3.0, 4.0);
+        assert_eq!(v.x, 3.0);
+        assert_eq!(v.y, 4.0);
+    }
+
+    #[test]
+    fn zero_returns_origin() {
+        let v = Vector2::zero();
+        assert_eq!(v.x, 0.0);
+        assert_eq!(v.y, 0.0);
+    }
+
+    #[test]
+    fn length_is_correct() {
+        let v = Vector2::new(3.0, 4.0);
+        assert!((v.length() - 5.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn length_of_zero_vector_is_zero() {
+        assert_eq!(Vector2::zero().length(), 0.0);
+    }
+
+    #[test]
+    fn scale_multiplies_both_components() {
+        let v = Vector2::new(2.0, -3.0).scale(4.0);
+        assert_eq!(v.x, 8.0);
+        assert_eq!(v.y, -12.0);
+    }
+
+    #[test]
+    fn scale_by_zero_gives_zero_vector() {
+        let v = Vector2::new(5.0, 7.0).scale(0.0);
+        assert_eq!(v.x, 0.0);
+        assert_eq!(v.y, 0.0);
+    }
+
+    #[test]
+    fn normalize_unit_vector_is_unchanged() {
+        let v = Vector2::new(1.0, 0.0).normalize().unwrap();
+        assert!((v.x - 1.0).abs() < 1e-10);
+        assert!((v.y - 0.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn normalize_gives_unit_length() {
+        let v = Vector2::new(3.0, 4.0).normalize().unwrap();
+        assert!((v.length() - 1.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn normalize_zero_vector_returns_none() {
+        assert!(Vector2::zero().normalize().is_none());
+    }
+
+    #[test]
+    fn add_sums_components() {
+        let a = Vector2::new(1.0, 2.0);
+        let b = Vector2::new(3.0, 4.0);
+        let c = a + b;
+        assert_eq!(c.x, 4.0);
+        assert_eq!(c.y, 6.0);
+    }
+
+    #[test]
+    fn add_assign_mutates_in_place() {
+        let mut a = Vector2::new(1.0, 2.0);
+        a += Vector2::new(3.0, 4.0);
+        assert_eq!(a.x, 4.0);
+        assert_eq!(a.y, 6.0);
+    }
+
+    #[test]
+    fn mul_scalar() {
+        let v = Vector2::new(3.0, 4.0);
+        let result = v * 2.0;
+        assert_eq!(result, Vector2::new(6.0, 8.0));
+    }
+
+    #[test]
+    fn mul_assign_scales_in_place() {
+        let mut v = Vector2::new(2.0, -5.0);
+        v *= 3.0;
+        assert_eq!(v.x, 6.0);
+        assert_eq!(v.y, -15.0);
+    }
+
+    #[test]
+    fn mul_assign_by_zero_zeroes_vector() {
+        let mut v = Vector2::new(9.0, 9.0);
+        v *= 0.0;
+        assert_eq!(v.x, 0.0);
+        assert_eq!(v.y, 0.0);
+    }
 }

@@ -29,31 +29,45 @@ pub fn router() -> Router<Arc<AppState>> {
 // POST /api/v1/bot/join
 // ---------------------------------------------------------------------------
 
-#[derive(Deserialize)]
-struct JoinRequest {
-    name: String,
-}
-
 #[derive(Serialize)]
 struct JoinResponse {
     player_id: Uuid,
     session_id: Uuid,
-    spawn_point: Vector2,
-    state: String,
 }
 
 async fn join(
     BotApiKey(api_key): BotApiKey,
     State(state): State<Arc<AppState>>,
-    Json(body): Json<JoinRequest>,
 ) -> ApiResult<Json<JoinResponse>> {
     let key_hash = hash_api_key(&api_key);
 
-    // Reject if this key already has an active player in the session.
+    // Load display name from the database.
+    let user_row = state.db.find_user_by_api_key_hash(&key_hash)
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("db error: {e}")))?
+        .ok_or(AppError::Unauthorized)?;
+
+    let display_name = user_row.display_name.unwrap_or(user_row.username);
+    let user_uuid = user_row.id.parse::<Uuid>()
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("invalid user id: {e}")))?;
+
+    // If the same user already has an active bot (possibly with a different API key),
+    // disconnect it before allowing the new join.
     {
-        let map = state.api_key_map.read().await;
-        if map.contains_key(&key_hash) {
-            return Err(AppError::Conflict("already_joined".into()));
+        let mut game = state.game.write().await;
+        let mut api_map = state.api_key_map.write().await;
+        if let Some((old_key_hash, old_player_id)) =
+            api_map.iter().find(|(_, pid)| {
+                game.players.get(pid).map_or(false, |p| p.user_id == user_uuid)
+            }).map(|(k, v)| (k.clone(), *v))
+        {
+            game.players.remove(&old_player_id);
+            api_map.remove(&old_key_hash);
+            let event = serde_json::json!({
+                "type": "player_left",
+                "timestamp": Utc::now().timestamp_millis(),
+                "player_id": old_player_id,
+            });
+            state.broadcast(event.to_string());
         }
     }
 
@@ -64,16 +78,17 @@ async fn join(
 
     let player = PlayerState {
         session_id,
-        user_id: player_id,
-        name: body.name.clone(),
-        position: Vector2::new(0.0, 0.0),
+        player_id,
+        user_id: user_uuid,
+        name: display_name.clone(),
+        position: Vector2::zero(),
         velocity: Vector2::zero(),
-        state: crate::models::PlayerMovementState::Jumping,
+        state: crate::models::PlayerMovementState::Landed,
         consecutive_bounces: 0,
         session_max_height: 0.0,
         activity_rating: 0.0,
         last_heartbeat: Utc::now(),
-        last_landed_position: Vector2::new(0.0, 0.0),
+        last_landed_position: Vector2::zero(),
     };
 
     state.game.write().await.players.insert(player_id, player);
@@ -83,12 +98,11 @@ async fn join(
         "type": "player_joined",
         "timestamp": Utc::now().timestamp_millis(),
         "player_id": player_id,
-        "name": body.name,
+        "name": display_name,
     });
     state.broadcast(event.to_string());
 
-    let spawn_point = Vector2::new(0.0, 0.0);
-    Ok(Json(JoinResponse { player_id, session_id, spawn_point, state: "JUMPING".to_string() }))
+    Ok(Json(JoinResponse { player_id, session_id }))
 }
 
 // ---------------------------------------------------------------------------
