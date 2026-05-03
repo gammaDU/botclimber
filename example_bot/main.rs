@@ -113,7 +113,6 @@ async fn main() -> Result<()> {
     let join_res = client
         .post(format!("{base_url}/api/v1/bot/join"))
         .header("X-API-Key", &api_key)
-        .json(&serde_json::json!({ "name": bot_name }))
         .send()
         .await
         .context("join request failed")?;

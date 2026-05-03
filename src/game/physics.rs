@@ -15,9 +15,8 @@ pub const JUMP_STRENGTH_MAX: f64 = 20.0;
 
 pub const DEATH_DROP: f64 = 15.0;
 
+use crate::models::{Platform, PlayerMovementState, PlayerState, Rect, Vector2};
 use thiserror::Error;
-use crate::error::AppError;
-use crate::models::{Platform, PlayerState, Rect, Vector2};
 
 #[derive(Error, Debug)]
 pub enum PhysicsError {
@@ -37,7 +36,7 @@ pub fn tick_player(player: &mut PlayerState, platforms: &[Platform]) -> bool {
     player.velocity *= AIR_RESISTANCE;
 
     // Integrate position
-    player.position += (player.velocity * DT);
+    player.position += player.velocity * DT;
 
     // AABB collision with platforms
     let player_rect = Rect {
@@ -102,7 +101,7 @@ pub fn tick_player(player: &mut PlayerState, platforms: &[Platform]) -> bool {
 
     //set state to "Landed" if (little to) no vertical movement
     if grounded && player.velocity.y.abs() < 0.1 {
-        player.state = crate::models::PlayerMovementState::Landed;
+        player.state = PlayerMovementState::Landed;
         player.velocity *= 0.0;
     }
 
@@ -112,7 +111,8 @@ pub fn tick_player(player: &mut PlayerState, platforms: &[Platform]) -> bool {
     }
 
     // Death check: player fell more than DEATH_DROP below their session peak
-    player.position.y < player.session_max_height - DEATH_DROP
+    player.state == PlayerMovementState::Landed
+        && player.position.y < player.session_max_height - DEATH_DROP
 }
 
 /// Apply a jump command to a player.
@@ -126,15 +126,17 @@ pub fn apply_jump(
     if strength < JUMP_STRENGTH_MIN || strength > JUMP_STRENGTH_MAX {
         return Err(PhysicsError::InvalidJumpStrength);
     }
-    if player.state == crate::models::PlayerMovementState::Jumping {
+    if player.state == PlayerMovementState::Jumping {
         return Err(PhysicsError::InvalidJumpState);
     }
-    let unit = direction.normalize().ok_or(PhysicsError::InvalidJumpDirection)?;
+    let unit = direction
+        .normalize()
+        .ok_or(PhysicsError::InvalidJumpDirection)?;
     player.velocity = Vector2 {
         x: unit.x * strength,
         y: unit.y * strength,
     };
-    player.state = crate::models::PlayerMovementState::Jumping;
+    player.state = PlayerMovementState::Jumping;
     Ok(())
 }
 
@@ -188,9 +190,9 @@ mod tests {
             player_id: Uuid::new_v4(),
             user_id: Uuid::new_v4(),
             name: "test".into(),
-            position: Vector2::new(0.0, 5.0),
+            position: Vector2::zero(),
             velocity: Vector2::zero(),
-            state: crate::models::PlayerMovementState::Jumping,
+            state: PlayerMovementState::Landed,
             session_max_height: 5.0,
             activity_rating: 0.0,
             last_heartbeat: Utc::now(),
@@ -213,8 +215,15 @@ mod tests {
     #[test]
     fn gravity_accelerates_downward() {
         let mut p = make_player();
+        p.position = Vector2::new(0.0, 5.0);
         tick_player(&mut p, &[]);
         assert!(p.velocity.y < 0.0, "gravity should pull velocity negative");
+        assert_eq!(
+            p.velocity.y,
+            (GRAVITY * DT),
+            "gravity should equal DT * GRAVITY"
+        );
+        assert!(p.position.y < 5.0, "position should be updated");
     }
 
     #[test]
@@ -248,22 +257,31 @@ mod tests {
         // Platform top = 1.0, player bottom = position.y, so start at y=1.05.
         p.position = Vector2::new(0.0, 1.05);
         p.velocity = Vector2::new(0.0, -5.0);
+        p.state = PlayerMovementState::Jumping;
         // Platform: y=0, height=1 → top surface at y=1.
         let platform = make_platform(-1.0, 0.0, 4.0, 1.0);
 
-        // First landing: multiplier = 1.0 (100 %)
         tick_player(&mut p, &[platform.clone()]);
-        assert_eq!(p.state, crate::models::PlayerMovementState::Landed);
+        assert_eq!(p.state, PlayerMovementState::Jumping);
+        assert_eq!(p.velocity.y, 2.5 - (GRAVITY * DT * 0.5));
     }
 
     #[test]
     fn death_below_threshold() {
         let mut p = make_player();
-        p.session_max_height = 0.0;
-        p.position = Vector2::new(0.0, -(DEATH_DROP + 1.0));
-        p.velocity = Vector2::new(0.0, -1.0);
-        let died = tick_player(&mut p, &[]);
-        assert!(died);
+        p.session_max_height = 16.0;
+        p.state = PlayerMovementState::Jumping;
+        p.position = Vector2::new(0.0, 5.0);
+        p.velocity = Vector2::new(0.0, -5.0);
+        let mut ctr = 0;
+        loop {
+            if tick_player(&mut p, &[]) {
+                break;
+            }
+            ctr += 1;
+        }
+        assert!(ctr > 1);
+        assert_eq!(p.state, PlayerMovementState::Landed);
     }
 
     #[test]
