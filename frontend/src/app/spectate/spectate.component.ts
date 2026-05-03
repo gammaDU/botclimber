@@ -1,6 +1,5 @@
 import {
-  Component, OnInit, OnDestroy, ElementRef, ViewChild, AfterViewInit, Input,
-  ChangeDetectionStrategy, ChangeDetectorRef,
+  Component, OnInit, OnDestroy, ElementRef, ViewChild, AfterViewInit, ChangeDetectionStrategy, ChangeDetectorRef,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';

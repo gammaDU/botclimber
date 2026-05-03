@@ -7,10 +7,10 @@ use tower_http::trace::TraceLayer;
 use crate::state::AppState;
 
 mod admin;
+pub mod auth;
 mod bot;
 mod system;
 mod user;
-pub mod auth;
 pub mod ws;
 
 pub fn router(state: Arc<AppState>) -> Router {
@@ -24,6 +24,9 @@ pub fn router(state: Arc<AppState>) -> Router {
     Router::new()
         .nest("/api/v1", api)
         // Serve compiled frontend from frontend/dist/ at "/"
-        .fallback_service(ServeDir::new("frontend/dist/browser").fallback(ServeFile::new("frontend/dist/browser/index.html")))
+        .fallback_service(
+            ServeDir::new("frontend/dist/browser")
+                .fallback(ServeFile::new("frontend/dist/browser/index.html")),
+        )
         .layer(TraceLayer::new_for_http())
 }

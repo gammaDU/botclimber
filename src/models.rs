@@ -1,6 +1,6 @@
-use std::ops::{Add, AddAssign, Mul, MulAssign};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use std::ops::{Add, AddAssign, Mul, MulAssign};
 use uuid::Uuid;
 
 // ---------------------------------------------------------------------------
@@ -26,17 +26,16 @@ impl Vector2 {
         (self.x * self.x + self.y * self.y).sqrt()
     }
 
-    pub fn scale(&self, scalar: f64) -> Self {
-        Self { x: self.x * scalar, y: self.y * scalar }
-    }
-
     /// Returns a unit vector, or None if the vector is zero-length.
     pub fn normalize(&self) -> Option<Self> {
         let len = self.length();
         if len < f64::EPSILON {
             None
         } else {
-            Some(Self { x: self.x / len, y: self.y / len })
+            Some(Self {
+                x: self.x / len,
+                y: self.y / len,
+            })
         }
     }
 }
@@ -44,7 +43,10 @@ impl Vector2 {
 impl Add for Vector2 {
     type Output = Self;
     fn add(self, rhs: Self) -> Self {
-        Self { x: self.x + rhs.x, y: self.y + rhs.y }
+        Self {
+            x: self.x + rhs.x,
+            y: self.y + rhs.y,
+        }
     }
 }
 
@@ -58,7 +60,10 @@ impl AddAssign for Vector2 {
 impl Mul<f64> for Vector2 {
     type Output = Self;
     fn mul(self, scalar: f64) -> Self {
-        Self { x: self.x * scalar, y: self.y * scalar }
+        Self {
+            x: self.x * scalar,
+            y: self.y * scalar,
+        }
     }
 }
 
@@ -221,20 +226,6 @@ mod vector2_tests {
     #[test]
     fn length_of_zero_vector_is_zero() {
         assert_eq!(Vector2::zero().length(), 0.0);
-    }
-
-    #[test]
-    fn scale_multiplies_both_components() {
-        let v = Vector2::new(2.0, -3.0).scale(4.0);
-        assert_eq!(v.x, 8.0);
-        assert_eq!(v.y, -12.0);
-    }
-
-    #[test]
-    fn scale_by_zero_gives_zero_vector() {
-        let v = Vector2::new(5.0, 7.0).scale(0.0);
-        assert_eq!(v.x, 0.0);
-        assert_eq!(v.y, 0.0);
     }
 
     #[test]

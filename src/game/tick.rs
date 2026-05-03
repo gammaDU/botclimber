@@ -2,7 +2,6 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::time;
 
-
 use crate::game::physics;
 use crate::state::AppState;
 
@@ -29,7 +28,12 @@ pub fn spawn(state: Arc<AppState>) {
                 if died {
                     dead_players.push(*player_id);
                 }
-                state.broadcast_position_update(*player_id, player.position, player.velocity, player.state);
+                state.broadcast_position_update(
+                    *player_id,
+                    player.position,
+                    player.velocity,
+                    player.state,
+                );
             }
 
             // Reset dead players to their last landed position

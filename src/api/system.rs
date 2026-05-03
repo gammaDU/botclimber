@@ -7,9 +7,9 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 
+use super::ws;
 use crate::error::ApiResult;
 use crate::state::AppState;
-use super::ws;
 
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()
@@ -125,9 +125,7 @@ struct WorldSnapshot {
     platforms: Vec<serde_json::Value>,
 }
 
-async fn snapshot(
-    State(state): State<Arc<AppState>>,
-) -> ApiResult<Json<WorldSnapshot>> {
+async fn snapshot(State(state): State<Arc<AppState>>) -> ApiResult<Json<WorldSnapshot>> {
     let game = state.game.read().await;
 
     let players = game
@@ -136,8 +134,14 @@ async fn snapshot(
         .map(|(id, p)| SnapshotPlayerEntry {
             player_id: id.to_string(),
             name: p.name.clone(),
-            position: PositionBody { x: p.position.x, y: p.position.y },
-            velocity: PositionBody { x: p.velocity.x, y: p.velocity.y },
+            position: PositionBody {
+                x: p.position.x,
+                y: p.position.y,
+            },
+            velocity: PositionBody {
+                x: p.velocity.x,
+                y: p.velocity.y,
+            },
             state: format!("{:?}", p.state),
         })
         .collect();

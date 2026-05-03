@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
+use axum::extract::ws::{Message, WebSocket};
 use axum::{
     extract::{State, WebSocketUpgrade},
     response::Response,
 };
-use axum::extract::ws::{Message, WebSocket};
 use tracing::{debug, warn};
 
 use crate::state::AppState;
@@ -14,10 +14,7 @@ use crate::state::AppState;
 /// Upgrades the connection to a WebSocket and streams all broadcast game
 /// events to the spectator.  The bootstrap sequence (subscribe → snapshot →
 /// replay buffered) is the client's responsibility per websocket_protocol.md §5.
-pub async fn handler(
-    ws: WebSocketUpgrade,
-    State(state): State<Arc<AppState>>,
-) -> Response {
+pub async fn handler(ws: WebSocketUpgrade, State(state): State<Arc<AppState>>) -> Response {
     ws.on_upgrade(move |socket| handle_socket(socket, state))
 }
 

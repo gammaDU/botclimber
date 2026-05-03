@@ -109,9 +109,7 @@ impl AppConfig {
             );
         }
         if self.auth.jwt_secret.len() < 32 {
-            anyhow::bail!(
-                "auth.jwt_secret must be at least 32 characters long"
-            );
+            anyhow::bail!("auth.jwt_secret must be at least 32 characters long");
         }
         Ok(())
     }

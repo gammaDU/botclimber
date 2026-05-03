@@ -1,8 +1,8 @@
 use axum::{
     extract::{FromRef, FromRequestParts},
-    http::{request::Parts, HeaderMap},
+    http::{HeaderMap, request::Parts},
 };
-use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
+use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use jsonwebtoken::{DecodingKey, EncodingKey, Header, Validation, decode, encode};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -159,7 +159,5 @@ fn bearer_token(headers: &HeaderMap) -> Result<&str, AppError> {
         .and_then(|v| v.to_str().ok())
         .ok_or(AppError::Unauthorized)?;
 
-    value
-        .strip_prefix("Bearer ")
-        .ok_or(AppError::Unauthorized)
+    value.strip_prefix("Bearer ").ok_or(AppError::Unauthorized)
 }

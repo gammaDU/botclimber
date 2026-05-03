@@ -1,5 +1,5 @@
-use std::cmp::PartialEq;
 use chrono::Utc;
+use std::cmp::PartialEq;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::{RwLock, broadcast};
@@ -114,7 +114,7 @@ impl AppState {
 
     /// Broadcast a JSON-serialised event string to all WebSocket subscribers.
     /// Silently ignores send errors (no active subscribers).
-    fn broadcast(&self, broadcast_type: BroadcastType,event_json: String) {
+    fn broadcast(&self, broadcast_type: BroadcastType, event_json: String) {
         if broadcast_type != BroadcastType::PositionUpdate {
             tracing::info!(event = %event_json, "ws_event");
         }

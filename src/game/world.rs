@@ -99,6 +99,9 @@ mod tests {
         // top_y = (LOOKAHEAD-1)*VERTICAL_STEP = 45. needed_top = highest_y + 50.
         // So highest_y must be <= -5 for no-op (45 >= highest_y + 50 → highest_y <= -5).
         let new = extend_platforms(&existing, -10.0);
-        assert!(new.is_empty(), "no new platforms needed when lookahead is satisfied");
+        assert!(
+            new.is_empty(),
+            "no new platforms needed when lookahead is satisfied"
+        );
     }
 }

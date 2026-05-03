@@ -43,12 +43,16 @@ async fn join(
     let key_hash = hash_api_key(&api_key);
 
     // Load display name from the database.
-    let user_row = state.db.find_user_by_api_key_hash(&key_hash)
+    let user_row = state
+        .db
+        .find_user_by_api_key_hash(&key_hash)
         .map_err(|e| AppError::Internal(anyhow::anyhow!("db error: {e}")))?
         .ok_or(AppError::Unauthorized)?;
 
     let display_name = user_row.display_name.unwrap_or(user_row.username);
-    let user_uuid = user_row.id.parse::<Uuid>()
+    let user_uuid = user_row
+        .id
+        .parse::<Uuid>()
         .map_err(|e| AppError::Internal(anyhow::anyhow!("invalid user id: {e}")))?;
 
     // If the same user already has an active bot (possibly with a different API key),
@@ -56,10 +60,14 @@ async fn join(
     {
         let mut game = state.game.write().await;
         let mut api_map = state.api_key_map.write().await;
-        if let Some((old_key_hash, old_player_id)) =
-            api_map.iter().find(|(_, pid)| {
-                game.players.get(pid).map_or(false, |p| p.user_id == user_uuid)
-            }).map(|(k, v)| (k.clone(), *v))
+        if let Some((old_key_hash, old_player_id)) = api_map
+            .iter()
+            .find(|(_, pid)| {
+                game.players
+                    .get(pid)
+                    .map_or(false, |p| p.user_id == user_uuid)
+            })
+            .map(|(k, v)| (k.clone(), *v))
         {
             game.players.remove(&old_player_id);
             api_map.remove(&old_key_hash);
@@ -91,7 +99,10 @@ async fn join(
 
     state.broadcast_player_joined(player_id, display_name);
 
-    Ok(Json(JoinResponse { player_id, session_id }))
+    Ok(Json(JoinResponse {
+        player_id,
+        session_id,
+    }))
 }
 
 // ---------------------------------------------------------------------------
@@ -130,7 +141,9 @@ async fn jump(
 
     // Validate before acquiring the write lock.
     if direction.normalize().is_none() {
-        return Err(AppError::BadRequest("direction must not be a zero vector".into()));
+        return Err(AppError::BadRequest(
+            "direction must not be a zero vector".into(),
+        ));
     }
     if body.strength < physics::JUMP_STRENGTH_MIN || body.strength > physics::JUMP_STRENGTH_MAX {
         return Err(AppError::BadRequest("strength out of range".into()));
@@ -138,18 +151,25 @@ async fn jump(
 
     let player_id = {
         let map = state.api_key_map.read().await;
-        *map.get(&key_hash).ok_or(AppError::Conflict("not_joined".into()))?
+        *map.get(&key_hash)
+            .ok_or(AppError::Conflict("not_joined".into()))?
     };
 
     let mut game = state.game.write().await;
-    let player = game.players.get_mut(&player_id)
+    let player = game
+        .players
+        .get_mut(&player_id)
         .ok_or_else(|| AppError::Internal(anyhow::anyhow!("player not found in game state")))?;
 
     match physics::apply_jump(player, direction, body.strength) {
         Ok(_) => (),
         Err(PhysicsError::InvalidJumpState) => return Err(AppError::Conflict("not_landed".into())),
-        Err(PhysicsError::InvalidJumpDirection) => return Err(AppError::BadRequest("invalid direction".into())),
-        Err(PhysicsError::InvalidJumpStrength) => return Err(AppError::BadRequest("invalid strength".into())),
+        Err(PhysicsError::InvalidJumpDirection) => {
+            return Err(AppError::BadRequest("invalid direction".into()));
+        }
+        Err(PhysicsError::InvalidJumpStrength) => {
+            return Err(AppError::BadRequest("invalid strength".into()));
+        }
     }
 
     Ok(Json(serde_json::json!({ "status": "ok" })))
@@ -167,11 +187,15 @@ async fn state(
 
     let player_id = {
         let map = app.api_key_map.read().await;
-        *map.get(&key_hash).ok_or(AppError::BadRequest("not joined; call /bot/join first".into()))?
+        *map.get(&key_hash).ok_or(AppError::BadRequest(
+            "not joined; call /bot/join first".into(),
+        ))?
     };
 
     let game = app.game.read().await;
-    let player = game.players.get(&player_id)
+    let player = game
+        .players
+        .get(&player_id)
         .ok_or_else(|| AppError::Internal(anyhow::anyhow!("player not found in game state")))?;
 
     let surrounding_platforms: Vec<_> = game.world.platforms.iter()
@@ -182,7 +206,7 @@ async fn state(
         "session_id": player.session_id,
         "position": { "x": player.position.x, "y": player.position.y },
         "velocity": { "x": player.velocity.x, "y": player.velocity.y },
-        "dimensions": { "x": crate::game::physics::PLAYER_WIDTH, "y": crate::game::physics::PLAYER_HEIGHT },
+        "dimensions": { "x": physics::PLAYER_WIDTH, "y": physics::PLAYER_HEIGHT },
         "session_max_height": player.session_max_height,
         "state": format!("{:?}", player.state),
         "surrounding_platforms": surrounding_platforms,
@@ -213,7 +237,8 @@ async fn leave(
 
     let player_id = {
         let mut map = state.api_key_map.write().await;
-        map.remove(&key_hash).ok_or(AppError::Conflict("not_joined".into()))?
+        map.remove(&key_hash)
+            .ok_or(AppError::Conflict("not_joined".into()))?
     };
 
     state.game.write().await.players.remove(&player_id);

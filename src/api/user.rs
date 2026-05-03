@@ -40,7 +40,10 @@ async fn register(
     State(state): State<Arc<AppState>>,
     Json(body): Json<RegisterRequest>,
 ) -> ApiResult<(StatusCode, Json<RegisterResponse>)> {
-    use argon2::{Argon2, PasswordHasher, password_hash::{SaltString, rand_core::OsRng}};
+    use argon2::{
+        Argon2, PasswordHasher,
+        password_hash::{SaltString, rand_core::OsRng},
+    };
 
     let password_hash = {
         let salt = SaltString::generate(&mut OsRng);
@@ -99,7 +102,10 @@ async fn login(
         .verify_password(body.password.as_bytes(), &parsed_hash)
         .map_err(|_| AppError::Unauthorized)?;
 
-    let user_id: Uuid = row.id.parse().map_err(|_| AppError::Internal(anyhow::anyhow!("bad uuid")))?;
+    let user_id: Uuid = row
+        .id
+        .parse()
+        .map_err(|_| AppError::Internal(anyhow::anyhow!("bad uuid")))?;
     let token = encode_jwt(
         &user_id,
         &row.username,
@@ -145,7 +151,9 @@ async fn update_profile(
     State(state): State<Arc<AppState>>,
     Json(body): Json<UpdateProfileRequest>,
 ) -> ApiResult<StatusCode> {
-    state.db.update_display_name(&claims.sub, &body.display_name)?;
+    state
+        .db
+        .update_display_name(&claims.sub, &body.display_name)?;
     Ok(StatusCode::NO_CONTENT)
 }
 

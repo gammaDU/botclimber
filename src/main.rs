@@ -1,7 +1,7 @@
 use anyhow::Result;
+use std::env;
 use std::sync::Arc;
 use tracing::info;
-use std::env;
 
 mod api;
 mod config;
@@ -35,7 +35,9 @@ async fn main() -> Result<()> {
     // _guard must be kept alive for the duration of the program
     let _appender_guard = _guard;
 
-    let config_path = env::args().nth(1).unwrap_or_else(|| "server_config".to_string());
+    let config_path = env::args()
+        .nth(1)
+        .unwrap_or_else(|| "server_config".to_string());
     let cfg = AppConfig::load(&config_path)?;
     info!("Configuration loaded");
 
@@ -65,7 +67,9 @@ async fn shutdown_signal() {
     use tokio::signal;
 
     let ctrl_c = async {
-        signal::ctrl_c().await.expect("failed to install Ctrl+C handler");
+        signal::ctrl_c()
+            .await
+            .expect("failed to install Ctrl+C handler");
     };
 
     #[cfg(unix)]

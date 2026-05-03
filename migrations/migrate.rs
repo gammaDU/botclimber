@@ -1,9 +1,10 @@
 use rusqlite::Connection;
-use rusqlite_migration::{Migrations, M};
+use rusqlite_migration::{M, Migrations};
 
 fn migrations() -> Migrations<'static> {
     Migrations::new(vec![
-        M::up("
+        M::up(
+            "
 CREATE TABLE IF NOT EXISTS users (
     id            TEXT PRIMARY KEY,
     username      TEXT NOT NULL UNIQUE,
@@ -33,7 +34,8 @@ CREATE TABLE IF NOT EXISTS high_scores (
 CREATE INDEX IF NOT EXISTS idx_high_scores_user   ON high_scores(user_id);
 CREATE INDEX IF NOT EXISTS idx_high_scores_height ON high_scores(max_height DESC);
 CREATE INDEX IF NOT EXISTS idx_sessions_user      ON sessions(user_id);
-        "),
+        ",
+        ),
         // Add future migrations here as additional M::up(...) entries.
     ])
 }
