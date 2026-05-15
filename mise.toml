@@ -21,6 +21,10 @@ description = "Start the backend server"
 run = "cargo run --bin botclimber -- server_config.toml"
 depends = ["frontend-build"]
 
+[tasks.test]
+description= "Run the tests in the backend"
+run = "cargo test --bin botclimber"
+
 [tasks.clippy]
 description = "Run Clippy linter"
 run = "cargo clippy -- -D warnings"

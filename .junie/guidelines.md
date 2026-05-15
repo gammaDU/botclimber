@@ -2,5 +2,4 @@
 - use the `docs/requirements.md` file to get an overview over the avialble docs
 - use the `.ai/project-summary.md` file to get an overview over the code 
 - use the skills in the `.junie/skills/*.md` files when prompted to do so. Skills will be deliberately called with the word `skill`
-
-use mise 
+- use mise to run the server, tests and clippy
