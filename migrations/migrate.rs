@@ -43,7 +43,7 @@ CREATE INDEX IF NOT EXISTS idx_sessions_user      ON sessions(user_id);
 fn main() {
     let db_path = std::env::args()
         .nth(1)
-        .unwrap_or_else(|| "botclimber.db".to_string());
+        .unwrap_or_else(|| ".data/botclimber.db".to_string());
 
     let mut conn = Connection::open(&db_path)
         .unwrap_or_else(|e| panic!("Failed to open database at '{}': {}", db_path, e));

@@ -1,40 +1,28 @@
 /// Example bot that connects to a running Botclimber server and jumps every 5 seconds.
 ///
-/// Usage:
-///   cargo run --bin example-bot -- [base_url] [username] [password] [bot_name]
+/// Configuration is read from a `.env` file (or environment variables):
+///   BOT_API_KEY   - (required) API key for the bot account
+///   BOT_BASE_URL  - base URL of the server (default: http://localhost:8080)
+///   BOT_NAME      - display name used in logs  (default: ExampleBot)
 ///
-/// Defaults:
-///   base_url  = http://localhost:8080
-///   username  = example_bot
-///   password  = example_bot_password
-///   bot_name  = ExampleBot
+/// Obtain an API key by logging in to the web UI and generating one on the
+/// account page, then put it in a `.env` file next to this crate:
+///
+///   BOT_API_KEY=your_api_key_here
 ///
 /// The bot will:
-///   1. Register a new account (ignores 409 Conflict if already registered).
-///   2. Log in to obtain a JWT.
-///   3. Generate / retrieve an API key.
-///   4. Join the game session.
-///   5. Jump straight up every 5 seconds until interrupted (Ctrl-C).
+///   1. Read the API key from the environment / .env file.
+///   2. Join the game session.
+///   3. Jump straight up every 5 seconds until interrupted (Ctrl-C).
 
 use anyhow::{Context, Result};
 use reqwest::Client;
 use serde::Deserialize;
-use std::env;
 use tokio::time::{Duration, sleep};
 
 // ---------------------------------------------------------------------------
 // Response types
 // ---------------------------------------------------------------------------
-
-#[derive(Deserialize)]
-struct LoginResponse {
-    token: String,
-}
-
-#[derive(Deserialize)]
-struct ApiKeyResponse {
-    api_key: String,
-}
 
 #[derive(Deserialize)]
 struct JoinResponse {
@@ -48,68 +36,22 @@ struct JoinResponse {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let mut args = env::args().skip(1);
-    let base_url = args.next().unwrap_or_else(|| "http://localhost:8080".into());
-    let username = args.next().unwrap_or_else(|| "example_bot".into());
-    let password = args.next().unwrap_or_else(|| "example_bot_password".into());
-    let bot_name = args.next().unwrap_or_else(|| "ExampleBot".into());
+    // Load .env file if present (silently ignore if missing)
+    let _ = dotenvy::dotenv();
 
+    let api_key = std::env::var("BOT_API_KEY")
+        .context("BOT_API_KEY must be set (in .env or environment)")?;
+    let base_url =
+        std::env::var("BOT_BASE_URL").unwrap_or_else(|_| "http://localhost:8080".into());
+    
     println!("Botclimber example bot");
     println!("  server  : {base_url}");
-    println!("  username: {username}");
     println!("  bot name: {bot_name}");
     println!();
 
     let client = Client::new();
 
-    // 1. Register (ignore 409 if account already exists)
-    let reg_res = client
-        .post(format!("{base_url}/api/v1/user/register"))
-        .json(&serde_json::json!({ "username": username, "password": password }))
-        .send()
-        .await
-        .context("register request failed")?;
-
-    match reg_res.status().as_u16() {
-        201 => println!("Registered new account."),
-        409 => println!("Account already exists, continuing."),
-        s => {
-            let body = reg_res.text().await.unwrap_or_default();
-            anyhow::bail!("Unexpected register status {s}: {body}");
-        }
-    }
-
-    // 2. Login → JWT
-    let login_res = client
-        .post(format!("{base_url}/api/v1/user/login"))
-        .json(&serde_json::json!({ "username": username, "password": password }))
-        .send()
-        .await
-        .context("login request failed")?;
-
-    if !login_res.status().is_success() {
-        let body = login_res.text().await.unwrap_or_default();
-        anyhow::bail!("Login failed: {body}");
-    }
-    let LoginResponse { token } = login_res.json().await.context("parse login response")?;
-    println!("Logged in, JWT obtained.");
-
-    // 3. Generate API key
-    let apikey_res = client
-        .post(format!("{base_url}/api/v1/user/apikey"))
-        .bearer_auth(&token)
-        .send()
-        .await
-        .context("apikey request failed")?;
-
-    if !apikey_res.status().is_success() {
-        let body = apikey_res.text().await.unwrap_or_default();
-        anyhow::bail!("API key generation failed: {body}");
-    }
-    let ApiKeyResponse { api_key } = apikey_res.json().await.context("parse apikey response")?;
-    println!("API key obtained.");
-
-    // 4. Join the game
+    // 1. Join the game
     let join_res = client
         .post(format!("{base_url}/api/v1/bot/join"))
         .header("X-API-Key", &api_key)
@@ -127,7 +69,7 @@ async fn main() -> Result<()> {
     println!();
     println!("Jumping every 5 seconds. Press Ctrl-C to stop.");
 
-    // 5. Jump loop
+    // 2. Jump loop
     loop {
         sleep(Duration::from_secs(5)).await;
 

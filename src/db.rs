@@ -39,11 +39,32 @@ impl Database {
     ) -> Result<()> {
         let conn = self.conn.lock().unwrap();
         conn.execute(
-            "INSERT INTO users (id, username, password_hash, api_key_hash, created_at)
+            "INSERT INTO users (id, username, display_name, password_hash, api_key_hash, created_at)
              VALUES (?1, ?2, ?3, ?4, ?5)",
-            params![id, username, password_hash, api_key_hash, created_at],
+            params![id, username, username, password_hash, api_key_hash, created_at],
         )?;
         Ok(())
+    }
+    
+    pub fn find_user_by_id(&self, id: &str) -> Result<Option<UserRow>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT id, username, password_hash, api_key_hash, created_at, display_name
+             FROM users WHERE id = ?1",
+        )?;
+        let mut rows = stmt.query(params![id])?;
+        if let Some(row) = rows.next()? {
+            Ok(Some(UserRow {
+                id: row.get(0)?,
+                username: row.get(1)?,
+                password_hash: row.get(2)?,
+                api_key_hash: row.get(3)?,
+                created_at: row.get(4)?,
+                display_name: row.get(5)?,
+            }))
+        } else {
+            Ok(None)
+        }
     }
 
     pub fn find_user_by_username(&self, username: &str) -> Result<Option<UserRow>> {
@@ -102,6 +123,15 @@ impl Database {
         conn.execute(
             "UPDATE users SET api_key_hash = ?1 WHERE id = ?2",
             params![new_hash, user_id],
+        )?;
+        Ok(())
+    }
+
+    pub fn update_password(&self, user_id: &str, new_password_hash: &str) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "UPDATE users SET password_hash = ?1 WHERE id = ?2",
+            params![new_password_hash, user_id],
         )?;
         Ok(())
     }

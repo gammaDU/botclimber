@@ -3,3 +3,4 @@
 /.data
 /logs
 /example_bot/target
+/example_bot/.env

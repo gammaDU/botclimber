@@ -236,6 +236,7 @@ paths:
               type: object
               properties:
                 display_name: { type: string }
+                password: { type: string, format: password }
       responses:
         '200':
           description: Profile updated.

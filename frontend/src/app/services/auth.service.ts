@@ -43,11 +43,11 @@ export class AuthService {
   }
 
   updateProfile(fields: Partial<{ username: string; password: string }>): Observable<void> {
-    return this.http.put<void>(`${BASE}/user/profile`, fields);
+    return this.http.patch<void>(`${BASE}/user/profile`, fields);
   }
 
   generateApiKey(): Observable<{ api_key: string }> {
-    return this.http.post<{ api_key: string }>(`${BASE}/user/api-key`, {});
+    return this.http.post<{ api_key: string }>(`${BASE}/user/apikey`, {});
   }
 
   private setToken(token: string | null): void {

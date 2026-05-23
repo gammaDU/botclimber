@@ -40,18 +40,7 @@ async fn register(
     State(state): State<Arc<AppState>>,
     Json(body): Json<RegisterRequest>,
 ) -> ApiResult<(StatusCode, Json<RegisterResponse>)> {
-    use argon2::{
-        Argon2, PasswordHasher,
-        password_hash::{SaltString, rand_core::OsRng},
-    };
-
-    let password_hash = {
-        let salt = SaltString::generate(&mut OsRng);
-        Argon2::default()
-            .hash_password(body.password.as_bytes(), &salt)
-            .map_err(|e| AppError::Internal(anyhow::anyhow!("argon2: {e}")))?
-            .to_string()
-    };
+    let password_hash = hash_password(&body.password)?;
 
     let api_key = generate_api_key();
     let api_key_hash = hash_api_key(&api_key);
@@ -67,6 +56,21 @@ async fn register(
         .map_err(|_| AppError::Conflict("username already taken".into()))?;
 
     Ok((StatusCode::CREATED, Json(RegisterResponse { user_id })))
+}
+
+fn hash_password(password: &str) -> Result<String, AppError> {
+    use argon2::{
+        Argon2, PasswordHasher,
+        password_hash::{SaltString, rand_core::OsRng},
+    };
+
+    {
+        let salt = SaltString::generate(&mut OsRng);
+        Ok(Argon2::default()
+            .hash_password(password.as_bytes(), &salt)
+            .map_err(|e| AppError::Internal(anyhow::anyhow!("argon2: {e}")))?
+            .to_string())
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -123,17 +127,23 @@ async fn login(
 
 #[derive(Serialize)]
 struct ProfileResponse {
-    user_id: String,
+    id: String,
     username: String,
+    display_name: String,
 }
 
 async fn profile(
     AuthUser(claims): AuthUser,
-    State(_state): State<Arc<AppState>>,
+    State(state): State<Arc<AppState>>,
 ) -> ApiResult<Json<ProfileResponse>> {
+    let user = state.db.find_user_by_username(claims.username.as_str())?;
     Ok(Json(ProfileResponse {
-        user_id: claims.sub,
-        username: claims.username,
+        id: claims.sub,
+        username: claims.username.clone(),
+        display_name: user
+            .as_ref()
+            .and_then(|u| u.display_name.clone())
+            .unwrap_or(claims.username),
     }))
 }
 
@@ -143,7 +153,8 @@ async fn profile(
 
 #[derive(Deserialize)]
 struct UpdateProfileRequest {
-    display_name: String,
+    display_name: Option<String>,
+    password: Option<String>,
 }
 
 async fn update_profile(
@@ -151,9 +162,16 @@ async fn update_profile(
     State(state): State<Arc<AppState>>,
     Json(body): Json<UpdateProfileRequest>,
 ) -> ApiResult<StatusCode> {
-    state
-        .db
-        .update_display_name(&claims.sub, &body.display_name)?;
+    if let Some(new_display_name) = body.display_name {
+        state
+            .db
+            .update_display_name(&claims.sub, &new_display_name)?;
+    }
+    if let Some(new_password) = body.password {
+        let password_hash = hash_password(&new_password)?;
+        state.db.update_password(&claims.sub, &password_hash)?;
+    }
+
     Ok(StatusCode::NO_CONTENT)
 }
 

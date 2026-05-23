@@ -11,6 +11,10 @@ path = "src/main.rs"
 name = "migrate"
 path = "migrations/migrate.rs"
 
+[[bin]]
+name = "example-bot"
+path = "example_bot/main.rs"
+
 
 [dependencies]
 # Async runtime
@@ -47,6 +51,10 @@ futures-util = "0.3"
 dashmap = "6"
 
 
+# Example bot
+dotenvy = "0.15"
+reqwest = { version = "0.12", features = ["json"] }
+
 # Utilities
 uuid = { version = "1", features = ["v4", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
@@ -55,6 +63,7 @@ anyhow = "1"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 tracing-appender = "0.2"
+sha2 = "0.11.0"
 
 [dev-dependencies]
 tokio-test = "0.4"

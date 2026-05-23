@@ -1,9 +1,8 @@
 use axum::{
     extract::{FromRef, FromRequestParts},
-    http::{HeaderMap, request::Parts},
+    http::{request::Parts, HeaderMap},
 };
-use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
-use jsonwebtoken::{DecodingKey, EncodingKey, Header, Validation, decode, encode};
+use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use uuid::Uuid;
@@ -71,22 +70,15 @@ pub fn decode_jwt(token: &str, secret: &str) -> Result<Claims, AppError> {
 
 /// Generate a new random API key (base64url, 32 bytes of entropy).
 pub fn generate_api_key() -> String {
-    use rand::RngCore;
-    let mut bytes = [0u8; 32];
-    rand::thread_rng().fill_bytes(&mut bytes);
-    URL_SAFE_NO_PAD.encode(bytes)
+    Uuid::new_v4().to_string()
 }
 
 /// Hash an API key for storage (SHA-256 via argon2 is overkill for a key;
 /// we use a simple SHA-256 hex digest so lookups stay fast).
 pub fn hash_api_key(key: &str) -> String {
-    use std::collections::hash_map::DefaultHasher;
-    use std::hash::{Hash, Hasher};
-    // NOTE: In production replace with SHA-256 (e.g. via `sha2` crate).
-    // Using DefaultHasher here only as a placeholder until sha2 is added.
-    let mut h = DefaultHasher::new();
-    key.hash(&mut h);
-    format!("{:016x}", h.finish())
+    use sha2::Digest;
+    let hash = sha2::Sha256::digest(key.as_bytes());
+    hash.iter().map(|b| format!("{:02x}", b)).collect()
 }
 
 // ---------------------------------------------------------------------------
