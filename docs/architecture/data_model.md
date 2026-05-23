@@ -27,9 +27,7 @@ Tracks individual gameplay sessions. Each session has a fully specified game mod
 | `id` | UUID | Primary key. |
 | `fall_mode` | TEXT | Fall behaviour: `Checkpoint` (reset to last landed platform) or `Hardcore` (fall freely until natural stop). |
 | `session_type` | TEXT | Session format: `Race` (first to goal wins), `Timetrial` (best time to goal), or `Infinite` (no goal, climb forever). |
-| `stage_type` | TEXT | Stage source: `Generated` (procedurally generated from seed) or `Fixed` (predefined stage). |
-| `fixed_stage_id` | TEXT | Identifier of the fixed stage layout. Only relevant when `stage_type = Fixed`; NULL otherwise. |
-| `goal_height` | REAL | The height (units) that constitutes reaching the goal. Only relevant for `Race` and `Timetrial` session types on `Generated` stages; NULL otherwise. |
+| `stage_config` | TEXT (JSON) | Serialised `StageConfig` fat enum. Either `{"Generated":{"seed":INTEGER,"goal_height":REAL\|null,"world":OBJECT}}` or `{"Fixed":{"stage_id":TEXT,"world":OBJECT}}`. |
 | `started_at` | DATETIME | Timestamp when the session started. |
 | `ended_at` | DATETIME | Timestamp when the session ended (NULL if active). |
 
@@ -64,29 +62,42 @@ Represents the runtime state of an active bot in the game world.
 | `activity_rating` | REAL | Rolling activity score used by the director cam to prioritize which players to focus on. Higher values indicate more recent or frequent actions. |
 | `last_heartbeat` | DATETIME | Used to cleanup inactive sessions. |
 
-### 2.2 `State`
-The top-level in-memory state container held by the Game Engine. Owns the world state and all active player states.
+### 2.2 `StageConfig` (Fat Enum)
+A Rust fat enum that bundles the stage source with all data specific to that variant. Used in the in-memory `State` and serialised to JSON in the `sessions.stage_config` column.
+
+```rust
+enum StageConfig {
+    Generated {
+        seed: u64,
+        goal_height: Option<f64>, // None for Infinite sessions
+        world: WorldState,
+    },
+    Fixed {
+        stage_id: String,
+        world: WorldState,
+    },
+}
+```
+
+### 2.3 `State`
+The top-level in-memory state container held by the Game Engine. Owns the stage config (including world) and all active player states.
 
 | Field | Type | Description |
 | :--- | :--- | :--- |
 | `session_id` | UUID | Unique identifier for the current gameplay session. |
 | `fall_mode` | Enum | Current fall behaviour: `Checkpoint` or `Hardcore`. |
 | `session_type` | Enum | Current session format: `Race`, `Timetrial`, or `Infinite`. |
-| `stage_type` | Enum | Current stage source: `Generated` or `Fixed`. |
-| `fixed_stage_id` | TEXT | Identifier of the active fixed stage. NULL when `stage_type = Generated`. |
-| `goal_height` | REAL | Target height for `Race` and `Timetrial` sessions on `Generated` stages. NULL otherwise. |
-| `world` | `WorldState` | The current world configuration (platforms, seed). |
+| `stage` | `StageConfig` | Fat enum carrying the stage source, world layout, and variant-specific data (`seed`/`goal_height` for Generated; `stage_id` for Fixed). |
 | `players` | Map<UUID, `PlayerState`> | Map from `user_id` to the corresponding `PlayerState` for every active player. |
 
-### 2.3 `WorldState`
-Maintains the global configuration of the tower.
+### 2.4 `WorldState`
+Maintains the global configuration of the tower. Embedded inside the appropriate `StageConfig` variant rather than held as a top-level field on `State`.
 
 | Field | Type | Description |
 | :--- | :--- | :--- |
 | `platforms` | List<Platform> | The list of platforms in the current world. For `Generated` stages this is a repeating pattern; for `Fixed` stages it is the full predefined layout. |
-| `seed` | INTEGER | The seed used for world generation. NULL for `Fixed` stages. |
 
-### 2.4 `Platform`
+### 2.5 `Platform`
 Defines a solid surface in the tower.
 
 | Field | Type | Description |
