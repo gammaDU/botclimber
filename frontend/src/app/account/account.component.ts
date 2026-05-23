@@ -60,9 +60,27 @@ import { AuthService, UserProfile } from '../services/auth.service';
 
     <!-- ── Profile panel (logged in) ── -->
     <div id="profile-panel" *ngIf="auth.isLoggedIn()">
-      <h2>{{ profile?.username ?? '…' }}</h2>
-      <p>Logged in</p>
+      <div id="profile-header">
+        <h2>Hello {{ profile?.username ?? auth.usernameFromToken() ?? '…' }}</h2>
+        <button id="btn-logout" (click)="logout()">Log out</button>
+      </div>
 
+      <!-- API key -->
+      <div class="profile-section">
+        <h3>API Key</h3>
+        <div class="api-key-row">
+          <span class="mono">{{ apiKey ?? '(hidden — generate to reveal)' }}</span>
+          <button *ngIf="apiKey" (click)="copyApiKey()" type="button" class="icon-btn" [title]="apiKeyCopied ? 'Copied!' : 'Copy to clipboard'">
+            <svg *ngIf="!apiKeyCopied" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+            <svg *ngIf="apiKeyCopied" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+          </button>
+        </div>
+        <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-top:0.5rem">
+          <button (click)="generateApiKey()">Generate new key</button>
+        </div>
+        <p class="form-error">{{ apiKeyError }}</p>
+      </div>
+      
       <!-- Change username -->
       <div class="profile-section">
         <h3>Change Displayname</h3>
@@ -90,16 +108,7 @@ import { AuthService, UserProfile } from '../services/auth.service';
         <p class="form-error">{{ passwordError }}</p>
         <p class="form-error" style="color:var(--success)">{{ passwordSuccess }}</p>
       </div>
-
-      <!-- API key -->
-      <div class="profile-section">
-        <h3>API Key</h3>
-        <p class="mono">{{ apiKey ?? '(hidden — generate to reveal)' }}</p>
-        <button (click)="generateApiKey()">Generate new key</button>
-        <p class="form-error">{{ apiKeyError }}</p>
-      </div>
-
-      <button id="btn-logout" (click)="logout()">Log out</button>
+      
     </div>
   `,
 })
@@ -128,6 +137,7 @@ export class AccountComponent implements OnInit {
 
   apiKey: string | null = null;
   apiKeyError = '';
+  apiKeyCopied = false;
 
   constructor(readonly auth: AuthService, private cd: ChangeDetectorRef) {}
 
@@ -169,11 +179,12 @@ export class AccountComponent implements OnInit {
   changeUsername(): void {
     this.usernameError = '';
     this.usernameSuccess = '';
-    this.auth.updateProfile({ username: this.newUsername }).subscribe({
+    this.auth.updateProfile({ display_name: this.newUsername }).subscribe({
       next: () => {
-        this.usernameSuccess = 'Username updated.';
+        this.usernameSuccess = 'Display name updated.';
         this.newUsername = '';
         this.loadProfile();
+        this.cd.markForCheck();
       },
       error: err => { this.setError('usernameError', err, 'Update failed'); },
     });
@@ -186,6 +197,7 @@ export class AccountComponent implements OnInit {
       next: () => {
         this.passwordSuccess = 'Password updated.';
         this.newPassword = '';
+        this.cd.markForCheck();
       },
       error: err => { this.setError('passwordError', err, 'Update failed'); },
     });
@@ -194,8 +206,17 @@ export class AccountComponent implements OnInit {
   generateApiKey(): void {
     this.apiKeyError = '';
     this.auth.generateApiKey().subscribe({
-      next: res => { this.apiKey = res.api_key; },
+      next: res => { this.apiKey = res.api_key; this.apiKeyCopied = false; this.cd.markForCheck(); },
       error: err => { this.setError('apiKeyError', err, 'Failed'); },
+    });
+  }
+
+  copyApiKey(): void {
+    if (!this.apiKey) return;
+    navigator.clipboard.writeText(this.apiKey).then(() => {
+      this.apiKeyCopied = true;
+      this.cd.markForCheck();
+      setTimeout(() => { this.apiKeyCopied = false; this.cd.markForCheck(); }, 2000);
     });
   }
 
@@ -222,7 +243,7 @@ export class AccountComponent implements OnInit {
 
   private loadProfile(): void {
     this.auth.getProfile().subscribe({
-      next: p => { this.profile = p; },
+      next: p => { this.profile = p; this.newUsername = p.display_name ?? ''; this.cd.markForCheck(); },
       error: () => { this.auth.logout(); },
     });
   }

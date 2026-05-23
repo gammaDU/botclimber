@@ -7,6 +7,7 @@ use axum::{
     routing::{get, post},
 };
 use serde::{Deserialize, Serialize};
+use tracing::error;
 use uuid::Uuid;
 
 use crate::api::auth::{AuthUser, encode_jwt, generate_api_key, hash_api_key};
@@ -53,7 +54,10 @@ async fn register(
     state
         .db
         .create_user(&id_str, &username, &password_hash, &api_key_hash, &now)
-        .map_err(|_| AppError::Conflict("username already taken".into()))?;
+        .map_err(|e| {
+            error!("Failed to create user: {e}");
+            AppError::Conflict("username already taken".into())
+        })?;
 
     Ok((StatusCode::CREATED, Json(RegisterResponse { user_id })))
 }

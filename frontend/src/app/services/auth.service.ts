@@ -9,6 +9,7 @@ const JWT_KEY = 'jwt';
 export interface UserProfile {
   id: string;
   username: string;
+  display_name: string;
   created_at: string;
 }
 
@@ -22,6 +23,18 @@ export class AuthService {
 
   isLoggedIn(): boolean {
     return this._token() !== null;
+  }
+
+  /** Decode the username from the stored JWT without a network call. */
+  usernameFromToken(): string | null {
+    const token = this._token();
+    if (!token) return null;
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      return payload.username ?? null;
+    } catch {
+      return null;
+    }
   }
 
   register(username: string, password: string): Observable<void> {
@@ -42,7 +55,7 @@ export class AuthService {
     return this.http.get<UserProfile>(`${BASE}/user/profile`);
   }
 
-  updateProfile(fields: Partial<{ username: string; password: string }>): Observable<void> {
+  updateProfile(fields: Partial<{ display_name: string; password: string }>): Observable<void> {
     return this.http.patch<void>(`${BASE}/user/profile`, fields);
   }
 

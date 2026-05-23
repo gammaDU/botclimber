@@ -40,7 +40,7 @@ impl Database {
         let conn = self.conn.lock().unwrap();
         conn.execute(
             "INSERT INTO users (id, username, display_name, password_hash, api_key_hash, created_at)
-             VALUES (?1, ?2, ?3, ?4, ?5)",
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
             params![id, username, username, password_hash, api_key_hash, created_at],
         )?;
         Ok(())
