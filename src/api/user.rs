@@ -134,6 +134,7 @@ struct ProfileResponse {
     id: String,
     username: String,
     display_name: String,
+    is_admin: bool,
 }
 
 async fn profile(
@@ -147,7 +148,8 @@ async fn profile(
         display_name: user
             .as_ref()
             .and_then(|u| u.display_name.clone())
-            .unwrap_or(claims.username),
+            .unwrap_or_else(|| claims.username.clone()),
+        is_admin: user.as_ref().map(|u| u.is_admin).unwrap_or(false),
     }))
 }
 

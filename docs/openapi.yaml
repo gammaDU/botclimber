@@ -669,6 +669,7 @@ components:
         id: { type: string, format: uuid }
         username: { type: string }
         display_name: { type: string }
+        is_admin: { type: boolean }
 
     LeaderboardEntry:
       type: object

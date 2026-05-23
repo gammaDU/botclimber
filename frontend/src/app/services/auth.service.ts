@@ -10,6 +10,7 @@ export interface UserProfile {
   id: string;
   username: string;
   display_name: string;
+  is_admin: boolean;
   created_at: string;
 }
 
