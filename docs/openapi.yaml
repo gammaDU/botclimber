@@ -129,6 +129,24 @@ paths:
         '409':
           $ref: '#/components/responses/NotJoined'
 
+  /bot/reset:
+    post:
+      tags:
+        - Bot
+      summary: Reset bot to starting position
+      description: |
+        Resets the player's figure to the starting position and restarts the timetrial timer.
+        Only meaningful in Timetrial session type; in other session types the position is reset but no timer is affected.
+      security:
+        - ApiKeyAuth: []
+      responses:
+        '200':
+          description: Reset successful. Player is back at the starting position and the timetrial timer has been restarted.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/NotJoined'
+
   /bot/leave:
     post:
       tags:
@@ -271,7 +289,11 @@ paths:
       tags:
         - Administration
       summary: Change server-wide game mode
-      description: Administrator only. Updates the game mode for all players.
+      description: |
+        Administrator only. Updates the active game mode configuration for the server.
+        All three dimensions can be changed independently. Omitted fields retain their current value.
+        `fixed_stage_id` is required when `stage_type` is `Fixed`.
+        `goal_height` is used when `session_type` is `Race` or `Timetrial` and `stage_type` is `Generated`.
       security:
         - BearerAuth: []
       requestBody:
@@ -280,14 +302,33 @@ paths:
           application/json:
             schema:
               type: object
-              required: [game_mode]
               properties:
-                game_mode:
+                fall_mode:
                   type: string
                   enum: [Checkpoint, Hardcore]
+                  description: "Checkpoint: bots respawn at the last reached checkpoint on fall. Hardcore: bots are eliminated on fall."
+                session_type:
+                  type: string
+                  enum: [Race, Timetrial, Infinite]
+                  description: "Race: first to goal height wins. Timetrial: each bot races alone for best time. Infinite: no goal, climb as high as possible."
+                stage_type:
+                  type: string
+                  enum: [Generated, Fixed]
+                  description: "Generated: platforms are procedurally generated each session. Fixed: a predefined stage layout is used."
+                fixed_stage_id:
+                  type: string
+                  description: "Identifier of the fixed stage to load. Required when stage_type is Fixed; ignored otherwise."
+                goal_height:
+                  type: number
+                  format: float
+                  description: "Target height (in world units) that bots must reach to finish. Used for Race and Timetrial on Generated stages; ignored for Fixed stages."
       responses:
         '200':
           description: Game mode updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GameModeConfig'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -391,11 +432,30 @@ paths:
         - System
       summary: Get high scores
       parameters:
-        - name: game_mode
+        - name: session_type
           in: query
+          description: "Filter by session type. If omitted, all session types are returned."
           schema:
             type: string
-            enum: [Checkpoint, Hardcore]
+            enum: [Race, Timetrial, Infinite]
+        - name: stage_type
+          in: query
+          description: "Filter by stage type. If omitted, all stage types are returned."
+          schema:
+            type: string
+            enum: [Generated, Fixed]
+        - name: session_id
+          in: query
+          description: "Filter entries by a specific session UUID. When provided, session_type and stage_type filters are ignored."
+          schema:
+            type: string
+            format: uuid
+        - name: user_id
+          in: query
+          description: "Filter entries by a specific user UUID. Can be combined with session_type, stage_type, or session_id filters."
+          schema:
+            type: string
+            format: uuid
       responses:
         '200':
           description: List of high score entries.
@@ -427,7 +487,7 @@ paths:
         - System
       summary: Get full world snapshot
       description: |
-        Returns the complete current game state in a single response: all active players with their positions and velocities, and all currently visible platforms. Intended to be fetched once on frontend load (before opening the WebSocket stream) to seed the local state map. Subsequent live updates are delivered via `/system/stream`.
+        Returns the complete current game state in a single response: all active players with their positions and velocities, all currently visible platforms, and the active game mode configuration. Intended to be fetched once on frontend load (before opening the WebSocket stream) to seed the local state map. Subsequent live updates are delivered via `/system/stream`.
       responses:
         '200':
           description: Current world snapshot.
@@ -605,7 +665,35 @@ components:
         session_id: { type: string, format: uuid }
         name: { type: string }
         height: { type: number }
-        game_mode: { type: string }
+        completion_time_ms:
+          type: integer
+          description: "Time in milliseconds to reach goal height. Present only for Timetrial entries."
+        game_mode:
+          $ref: '#/components/schemas/GameModeConfig'
+
+    GameModeConfig:
+      type: object
+      description: "The active game mode configuration, composed of three independent dimensions."
+      properties:
+        fall_mode:
+          type: string
+          enum: [Checkpoint, Hardcore]
+          description: "Checkpoint: bots are reset to the last platform they successfully landed on when they fall. Hardcore: no automatic reset; bots fall freely until they come to a natural stop."
+        session_type:
+          type: string
+          enum: [Race, Timetrial, Infinite]
+          description: "Race: first to goal height wins. Timetrial: each bot races alone for best time. Infinite: no goal, climb as high as possible."
+        stage_type:
+          type: string
+          enum: [Generated, Fixed]
+          description: "Generated: platforms are procedurally generated each session. Fixed: a predefined stage layout is used."
+        fixed_stage_id:
+          type: string
+          description: "Identifier of the active fixed stage. Present only when stage_type is Fixed."
+        goal_height:
+          type: number
+          format: float
+          description: "Target height bots must reach to finish. Present only when session_type is Race or Timetrial and stage_type is Generated."
 
     WorldSnapshot:
       type: object
@@ -614,7 +702,8 @@ components:
           type: string
           format: date-time
           description: ISO-8601 UTC timestamp of when the snapshot was taken on the server.
-        game_mode: { type: string, enum: [Checkpoint, Hardcore], description: "The active game mode for the entire world at the time of the snapshot." }
+        game_mode:
+          $ref: '#/components/schemas/GameModeConfig'
         players:
           type: array
           description: All currently active players with their live position, velocity, and state.

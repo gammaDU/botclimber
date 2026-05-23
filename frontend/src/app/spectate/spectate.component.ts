@@ -59,7 +59,8 @@ const WORLD_SCALE = CANVAS_W / (TOWER_HALF_WIDTH * 2); // pixels per world unit 
               }
           </div>
           <div id="game-container">
-              <canvas #canvas id="game-canvas" [width]="canvasW" [height]="canvasH"></canvas>
+              <canvas #canvas id="game-canvas" [width]="canvasW" [height]="canvasH"
+                      (wheel)="onWheel($event)"></canvas>
 
               <div id="session-panel">
                   <h2>Active Players</h2>
@@ -164,6 +165,18 @@ export class SpectateComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   follow(id: string | null): void { this.followId = id; }
+
+  onWheel(e: WheelEvent): void {
+    if (this.followId !== null) return;
+    e.preventDefault();
+    // deltaY > 0 = scroll down → move camera down (lower camY)
+    this.camY -= e.deltaY / WORLD_SCALE;
+    // Clamp: never below world origin, never above the topmost platform
+    const maxCamY = this.platforms.size > 0
+      ? Math.max(...Array.from(this.platforms.values()).map(p => p.rect.y + p.rect.height))
+      : 0;
+    this.camY = Math.max(0, Math.min(this.camY, maxCamY));
+  }
 
   // ---------------------------------------------------------------------------
   // Bootstrap: fetch snapshot, replay buffer

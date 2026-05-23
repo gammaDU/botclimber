@@ -88,10 +88,33 @@ tick_rate_hz = 60
 # Default: 300 (5 minutes)
 player_timeout_seconds = 300
 
-# Default game mode for new players joining without specifying a mode.
+# Fall behaviour mode: what happens when a player falls off a platform.
 # Valid values: "Checkpoint", "Hardcore"
 # Default: "Checkpoint"
-default_game_mode = "Checkpoint"
+fall_mode = "Checkpoint"
+
+# Session type: defines the win/end condition for a session.
+# Valid values: "Race", "Timetrial", "Infinite"
+# Default: "Race"
+session_type = "Race"
+
+# Stage type: how the world platforms are produced each session.
+# Valid values: "Generated", "Fixed"
+# Default: "Generated"
+stage_type = "Generated"
+
+# Fixed stage identifier: the name/ID of the hand-crafted stage layout to load.
+# Only used when stage_type = "Fixed". Ignored for Generated stages.
+# The value must match a stage file present in the stages directory.
+# Default: "default"
+fixed_stage_id = "default"
+
+# Goal height: the Y coordinate (world units) a player must reach to finish.
+# Used by Race and Timetrial session types on Generated stages.
+# Ignored for Fixed stages (the goal is defined inside the stage layout file)
+# and for Infinite sessions (which have no end condition).
+# Default: 1000.0
+goal_height = 1000.0
 
 # ── Frontend ──────────────────────────────────────────────────────────────────
 [frontend]
@@ -125,7 +148,11 @@ BOTCLIMBER_<SECTION>_<KEY>   (all uppercase, dots replaced by underscores)
 | `BOTCLIMBER_GAME_MAX_PLAYERS` | `game.max_players` | `50` |
 | `BOTCLIMBER_GAME_TICK_RATE_HZ` | `game.tick_rate_hz` | `60` |
 | `BOTCLIMBER_GAME_PLAYER_TIMEOUT_SECONDS` | `game.player_timeout_seconds` | `120` |
-| `BOTCLIMBER_GAME_DEFAULT_GAME_MODE` | `game.default_game_mode` | `Hardcore` |
+| `BOTCLIMBER_GAME_FALL_MODE` | `game.fall_mode` | `Hardcore` |
+| `BOTCLIMBER_GAME_SESSION_TYPE` | `game.session_type` | `Infinite` |
+| `BOTCLIMBER_GAME_STAGE_TYPE` | `game.stage_type` | `Fixed` |
+| `BOTCLIMBER_GAME_FIXED_STAGE_ID` | `game.fixed_stage_id` | `my-custom-stage` |
+| `BOTCLIMBER_GAME_GOAL_HEIGHT` | `game.goal_height` | `2000.0` |
 | `BOTCLIMBER_FRONTEND_DIST_PATH` | `frontend.dist_path` | `/srv/botclimber/dist` |
 
 ---
