@@ -23,6 +23,7 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/jump", post(jump))
         .route("/state", get(state))
         .route("/statistics", get(statistics))
+        .route("/reset", post(reset))
         .route("/leave", post(leave))
 }
 
@@ -187,9 +188,8 @@ async fn state(
 
     let player_id = {
         let map = app.api_key_map.read().await;
-        *map.get(&key_hash).ok_or(AppError::BadRequest(
-            "not joined; call /bot/join first".into(),
-        ))?
+        *map.get(&key_hash)
+            .ok_or(AppError::Conflict("not_joined".into()))?
     };
 
     let game = app.game.read().await;
@@ -223,6 +223,34 @@ async fn statistics(
 ) -> ApiResult<Json<serde_json::Value>> {
     // TODO: query DB for PlayerStatistics
     Ok(Json(serde_json::json!({ "status": "not implemented" })))
+}
+
+// ---------------------------------------------------------------------------
+// POST /api/v1/bot/reset
+// ---------------------------------------------------------------------------
+
+async fn reset(
+    BotApiKey(api_key): BotApiKey,
+    State(state): State<Arc<AppState>>,
+) -> ApiResult<Json<serde_json::Value>> {
+    let key_hash = hash_api_key(&api_key);
+
+    let player_id = {
+        let map = state.api_key_map.read().await;
+        *map.get(&key_hash)
+            .ok_or(AppError::Conflict("not_joined".into()))?
+    };
+
+    let mut game = state.game.write().await;
+    let player = game
+        .players
+        .get_mut(&player_id)
+        .ok_or_else(|| AppError::Internal(anyhow::anyhow!("player not found in game state")))?;
+
+    player.position = Vector2::zero();
+    player.velocity = Vector2::zero();
+
+    Ok(Json(serde_json::json!({ "status": "ok" })))
 }
 
 // ---------------------------------------------------------------------------

@@ -25,9 +25,14 @@ pub fn router() -> Router<Arc<AppState>> {
 
 #[derive(Deserialize)]
 struct LeaderboardQuery {
-    game_mode: Option<String>,
+    session_type: Option<String>,
+    stage_type: Option<String>,
+    session_id: Option<String>,
+    user_id: Option<String>,
     #[serde(default = "default_limit")]
     limit: i64,
+    #[serde(default)]
+    offset: i64,
 }
 
 fn default_limit() -> i64 {
@@ -46,9 +51,14 @@ async fn leaderboard(
     State(state): State<Arc<AppState>>,
     Query(params): Query<LeaderboardQuery>,
 ) -> ApiResult<Json<Vec<LeaderboardEntry>>> {
-    let rows = state
-        .db
-        .get_leaderboard(params.game_mode.as_deref(), params.limit)?;
+    let rows = state.db.get_leaderboard(
+        params.session_type.as_deref(),
+        params.stage_type.as_deref(),
+        params.session_id.as_deref(),
+        params.user_id.as_deref(),
+        params.limit,
+        params.offset,
+    )?;
 
     let entries = rows
         .into_iter()
@@ -119,6 +129,7 @@ struct PositionBody {
 #[derive(Serialize)]
 struct WorldSnapshot {
     timestamp: i64,
+    session_id: String,
     game_mode: String,
     tick: u64,
     players: Vec<SnapshotPlayerEntry>,
@@ -158,6 +169,7 @@ async fn snapshot(State(state): State<Arc<AppState>>) -> ApiResult<Json<WorldSna
 
     Ok(Json(WorldSnapshot {
         timestamp: chrono::Utc::now().timestamp_millis(),
+        session_id: game.session_id.to_string(),
         game_mode: game.game_mode.to_string(),
         tick: game.world.tick,
         players,

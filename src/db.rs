@@ -186,37 +186,65 @@ impl Database {
 
     pub fn get_leaderboard(
         &self,
-        game_mode: Option<&str>,
+        session_type: Option<&str>,
+        stage_type: Option<&str>,
+        session_id: Option<&str>,
+        user_id: Option<&str>,
         limit: i64,
+        offset: i64,
     ) -> Result<Vec<LeaderboardRow>> {
         let conn = self.conn.lock().unwrap();
-        let sql = if game_mode.is_some() {
-            "SELECT u.username, h.max_height, s.game_mode, h.achieved_at
-             FROM high_scores h
-             JOIN users u ON u.id = h.user_id
-             JOIN sessions s ON s.id = h.session_id
-             WHERE s.game_mode = ?1
-             ORDER BY h.max_height DESC
-             LIMIT ?2"
+
+        let mut conditions: Vec<String> = Vec::new();
+        if session_id.is_some() {
+            conditions.push("h.session_id = :session_id".into());
         } else {
-            "SELECT u.username, h.max_height, s.game_mode, h.achieved_at
-             FROM high_scores h
-             JOIN users u ON u.id = h.user_id
-             JOIN sessions s ON s.id = h.session_id
-             ORDER BY h.max_height DESC
-             LIMIT ?2"
+            if session_type.is_some() {
+                conditions.push("s.session_type = :session_type".into());
+            }
+            if stage_type.is_some() {
+                conditions.push("s.stage_type = :stage_type".into());
+            }
+        }
+        if user_id.is_some() {
+            conditions.push("h.user_id = :user_id".into());
+        }
+
+        let where_clause = if conditions.is_empty() {
+            String::new()
+        } else {
+            format!("WHERE {}", conditions.join(" AND "))
         };
 
-        let mut stmt = conn.prepare(sql)?;
-        let mode_str = game_mode.unwrap_or("");
-        let rows = stmt.query_map(params![mode_str, limit], |row| {
-            Ok(LeaderboardRow {
-                username: row.get(0)?,
-                max_height: row.get(1)?,
-                game_mode: row.get(2)?,
-                achieved_at: row.get(3)?,
-            })
-        })?;
+        let sql = format!(
+            "SELECT u.username, h.max_height, s.game_mode, h.achieved_at
+             FROM high_scores h
+             JOIN users u ON u.id = h.user_id
+             JOIN sessions s ON s.id = h.session_id
+             {where_clause}
+             ORDER BY h.max_height DESC
+             LIMIT :limit OFFSET :offset"
+        );
+
+        let mut stmt = conn.prepare(&sql)?;
+        let rows = stmt.query_map(
+            rusqlite::named_params! {
+                ":session_type": session_type.unwrap_or(""),
+                ":stage_type": stage_type.unwrap_or(""),
+                ":session_id": session_id.unwrap_or(""),
+                ":user_id": user_id.unwrap_or(""),
+                ":limit": limit,
+                ":offset": offset,
+            },
+            |row| {
+                Ok(LeaderboardRow {
+                    username: row.get(0)?,
+                    max_height: row.get(1)?,
+                    game_mode: row.get(2)?,
+                    achieved_at: row.get(3)?,
+                })
+            },
+        )?;
 
         let mut result = Vec::new();
         for row in rows {

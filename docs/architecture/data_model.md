@@ -27,7 +27,10 @@ Tracks individual gameplay sessions. Each session has a fully specified game mod
 | `id` | UUID | Primary key. |
 | `fall_mode` | TEXT | Fall behaviour: `Checkpoint` (reset to last landed platform) or `Hardcore` (fall freely until natural stop). |
 | `session_type` | TEXT | Session format: `Race` (first to goal wins), `Timetrial` (best time to goal), or `Infinite` (no goal, climb forever). |
-| `stage_config` | TEXT (JSON) | Serialised `StageConfig` fat enum. Either `{"Generated":{"seed":INTEGER,"goal_height":REAL\|null,"world":OBJECT}}` or `{"Fixed":{"stage_id":TEXT,"world":OBJECT}}`. |
+| `stage_type` | TEXT | Stage source: `Generated` or `Fixed`. Determines which of the following columns are populated. |
+| `seed` | INTEGER | RNG seed used to generate the stage. Only populated for `Generated` stages; NULL for `Fixed`. |
+| `goal_height` | REAL | Height (units) a player must reach to complete the session. Populated for `Generated` stages with `Race` or `Timetrial` session types; NULL for `Infinite` or `Fixed` stages. |
+| `fixed_stage_id` | TEXT | Identifier of the predefined stage layout. Only populated for `Fixed` stages; NULL for `Generated`. |
 | `started_at` | DATETIME | Timestamp when the session started. |
 | `ended_at` | DATETIME | Timestamp when the session ended (NULL if active). |
 
@@ -63,7 +66,7 @@ Represents the runtime state of an active bot in the game world.
 | `last_heartbeat` | DATETIME | Used to cleanup inactive sessions. |
 
 ### 2.2 `StageConfig` (Fat Enum)
-A Rust fat enum that bundles the stage source with all data specific to that variant. Used in the in-memory `State` and serialised to JSON in the `sessions.stage_config` column.
+A Rust fat enum that bundles the stage source with all data specific to that variant. Used in the in-memory `State`. When persisted to the `sessions` table the variant fields are stored as individual columns (see section 1.2).
 
 ```rust
 enum StageConfig {

@@ -28,7 +28,11 @@ pub fn router() -> Router<Arc<AppState>> {
 
 #[derive(Deserialize)]
 struct SetModeRequest {
-    game_mode: String,
+    fall_mode: Option<String>,
+    session_type: Option<String>,
+    stage_type: Option<String>,
+    fixed_stage_id: Option<String>,
+    goal_height: Option<f64>,
 }
 
 async fn set_mode(
@@ -36,16 +40,27 @@ async fn set_mode(
     State(state): State<Arc<AppState>>,
     Json(body): Json<SetModeRequest>,
 ) -> ApiResult<Json<serde_json::Value>> {
-    let mode: GameMode = body
-        .game_mode
-        .parse()
-        .map_err(|_| AppError::BadRequest("invalid game_mode".into()))?;
+    let mut game = state.game.write().await;
 
-    state.game.write().await.game_mode = mode;
+    if let Some(ref fall_mode) = body.fall_mode {
+        let mode: GameMode = fall_mode
+            .parse()
+            .map_err(|_| AppError::BadRequest("invalid fall_mode".into()))?;
+        game.game_mode = mode;
+    }
 
-    state.broadcast_world_reset(mode);
+    let current_mode = game.game_mode;
+    drop(game);
 
-    Ok(Json(serde_json::json!({ "game_mode": mode.to_string() })))
+    state.broadcast_world_reset(current_mode);
+
+    Ok(Json(serde_json::json!({
+        "fall_mode": current_mode.to_string(),
+        "session_type": body.session_type,
+        "stage_type": body.stage_type,
+        "fixed_stage_id": body.fixed_stage_id,
+        "goal_height": body.goal_height,
+    })))
 }
 
 // ---------------------------------------------------------------------------
