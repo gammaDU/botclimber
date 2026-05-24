@@ -255,7 +255,9 @@ main { flex: 1; padding: 1.5rem; max-width: 1100px; margin: 0 auto; width: 100%;
   border: 1px solid var(--border);
   border-radius: 6px;
   padding: 1.5rem;
-  max-width: 480px;
+  min-width: 360px;
+  max-width: 640px;
+  flex: 1;
 }
 
 #profile-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem; }
@@ -325,3 +327,32 @@ main { flex: 1; padding: 1.5rem; max-width: 1100px; margin: 0 auto; width: 100%;
   font-size: 0.9rem;
 }
 .profile-section input:focus { outline: none; border-color: var(--accent); }
+.profile-section select {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 0.4rem 0.6rem;
+  border-radius: 4px;
+  font-size: 0.9rem;
+}
+.profile-section select:focus { outline: none; border-color: var(--accent); }
+
+/* Account panels wrapper */
+#account-panels {
+  display: flex;
+  align-items: flex-start;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+
+/* Admin panel */
+#admin-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 1.5rem;
+  min-width: 360px;
+  max-width: 640px;
+  flex: 1;
+}
+#admin-panel h2 { margin: 0 0 0.25rem; }

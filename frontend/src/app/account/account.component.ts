@@ -2,6 +2,7 @@ import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { AuthService, UserProfile } from '../services/auth.service';
+import { AdminService, GameModeConfig } from '../services/admin.service';
 
 @Component({
   selector: 'app-account',
@@ -58,8 +59,9 @@ import { AuthService, UserProfile } from '../services/auth.service';
 
     </div>
 
-    <!-- ── Profile panel (logged in) ── -->
-    <div id="profile-panel" *ngIf="auth.isLoggedIn()">
+    <!-- ── Profile + Admin panels (logged in) ── -->
+    <div id="account-panels" *ngIf="auth.isLoggedIn()">
+    <div id="profile-panel">
       <div id="profile-header">
         <h2>Hello {{ profile?.username ?? auth.usernameFromToken() ?? '…' }}</h2>
         <button id="btn-logout" (click)="logout()">Log out</button>
@@ -110,6 +112,68 @@ import { AuthService, UserProfile } from '../services/auth.service';
       </div>
       
     </div>
+
+    <!-- ── Admin control panel (logged in + is_admin) ── -->
+    <div id="admin-panel" *ngIf="profile?.is_admin">
+      <h2>Admin Control Panel</h2>
+
+      <!-- Game mode -->
+      <div class="profile-section">
+        <h3>Game Mode</h3>
+        <form (ngSubmit)="applyMode()">
+          <label>
+            Fall Mode
+            <select [(ngModel)]="adminMode.fall_mode" name="fall_mode">
+              <option value="Checkpoint">Checkpoint</option>
+              <option value="Hardcore">Hardcore</option>
+            </select>
+          </label>
+          <label>
+            Session Type
+            <select [(ngModel)]="adminMode.session_type" name="session_type">
+              <option value="Race">Race</option>
+              <option value="Timetrial">Timetrial</option>
+              <option value="Infinite">Infinite</option>
+            </select>
+          </label>
+          <label>
+            Stage Type
+            <select [(ngModel)]="adminMode.stage_type" name="stage_type">
+              <option value="Generated">Generated</option>
+              <option value="Fixed">Fixed</option>
+            </select>
+          </label>
+          <label *ngIf="adminMode.stage_type === 'Fixed'">
+            Fixed Stage ID
+            <input type="text" [(ngModel)]="adminMode.fixed_stage_id" name="fixed_stage_id" />
+          </label>
+          <label *ngIf="adminMode.stage_type === 'Generated' && adminMode.session_type !== 'Infinite'">
+            Goal Height
+            <input type="number" [(ngModel)]="adminMode.goal_height" name="goal_height" step="any" />
+          </label>
+          <button type="submit">Apply</button>
+        </form>
+        <p class="form-error">{{ adminModeError }}</p>
+        <p class="form-error" style="color:var(--success)">{{ adminModeSuccess }}</p>
+      </div>
+
+      <!-- Session -->
+      <div class="profile-section">
+        <h3>Session</h3>
+        <button (click)="restartSession()">Restart Session</button>
+        <p class="form-error">{{ adminSessionError }}</p>
+        <p class="form-error" style="color:var(--success)">{{ adminSessionSuccess }}</p>
+      </div>
+
+      <!-- Players -->
+      <div class="profile-section">
+        <h3>Players</h3>
+        <button (click)="resetPlayers()">Reset All Players</button>
+        <p class="form-error">{{ adminPlayersError }}</p>
+        <p class="form-error" style="color:var(--success)">{{ adminPlayersSuccess }}</p>
+      </div>
+    </div>
+    </div>
   `,
 })
 export class AccountComponent implements OnInit {
@@ -139,7 +203,15 @@ export class AccountComponent implements OnInit {
   apiKeyError = '';
   apiKeyCopied = false;
 
-  constructor(readonly auth: AuthService, private cd: ChangeDetectorRef) {}
+  adminMode: GameModeConfig = { fall_mode: 'Checkpoint', session_type: 'Infinite', stage_type: 'Generated' };
+  adminModeError = '';
+  adminModeSuccess = '';
+  adminSessionError = '';
+  adminSessionSuccess = '';
+  adminPlayersError = '';
+  adminPlayersSuccess = '';
+
+  constructor(readonly auth: AuthService, private admin: AdminService, private cd: ChangeDetectorRef) {}
 
   ngOnInit(): void {
     if (this.auth.isLoggedIn()) this.loadProfile();
@@ -220,7 +292,7 @@ export class AccountComponent implements OnInit {
     });
   }
 
-  private setError(target: 'logError' | 'regError' | 'usernameError' | 'passwordError' | 'apiKeyError', err: any, fallback: string): void {
+  private setError(target: 'logError' | 'regError' | 'usernameError' | 'passwordError' | 'apiKeyError' | 'adminModeError' | 'adminSessionError' | 'adminPlayersError', err: any, fallback: string): void {
     (this as any)[target] = this.extractError(err, fallback);
     this.cd.markForCheck();
   }
@@ -239,6 +311,33 @@ export class AccountComponent implements OnInit {
       case 'internal server error': return 'Something went wrong on the server. Please try again later.';
       default: return raw;
     }
+  }
+
+  applyMode(): void {
+    this.adminModeError = '';
+    this.adminModeSuccess = '';
+    this.admin.setMode(this.adminMode).subscribe({
+      next: () => { this.adminModeSuccess = 'Game mode updated.'; this.cd.markForCheck(); },
+      error: err => { this.setError('adminModeError', err, 'Failed to update mode'); },
+    });
+  }
+
+  restartSession(): void {
+    this.adminSessionError = '';
+    this.adminSessionSuccess = '';
+    this.admin.resetWorld().subscribe({
+      next: () => { this.adminSessionSuccess = 'Session restarted.'; this.cd.markForCheck(); },
+      error: err => { this.setError('adminSessionError', err, 'Failed to restart session'); },
+    });
+  }
+
+  resetPlayers(): void {
+    this.adminPlayersError = '';
+    this.adminPlayersSuccess = '';
+    this.admin.resetAllPlayers().subscribe({
+      next: () => { this.adminPlayersSuccess = 'All players reset.'; this.cd.markForCheck(); },
+      error: err => { this.setError('adminPlayersError', err, 'Failed to reset players'); },
+    });
   }
 
   private loadProfile(): void {
