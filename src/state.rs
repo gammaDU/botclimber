@@ -8,7 +8,7 @@ use uuid::Uuid;
 use crate::config::AppConfig;
 use crate::db::Database;
 use crate::game::world;
-use crate::models::{GameMode, PlayerMovementState, State, Vector2, WorldState};
+use crate::models::{GameModeConfig, PlayerMovementState, State, Vector2, WorldState};
 
 /// Capacity of the broadcast channel for WebSocket events.
 const BROADCAST_CAPACITY: usize = 256;
@@ -28,15 +28,11 @@ pub struct AppState {
 
 impl AppState {
     pub fn new(config: AppConfig, db: Database) -> Self {
-        let game_mode = config
-            .game
-            .default_game_mode
-            .parse::<GameMode>()
-            .unwrap_or(GameMode::Checkpoint);
-
+        let session_id = Uuid::new_v4();
+        let game_mode = GameModeConfig::default();
         let initial_state = State {
-            session_id: Uuid::new_v4(),
-            game_mode,
+            session_id,
+            game_mode: game_mode.clone(),
             world: WorldState {
                 platforms: world::initial_platforms(),
                 tick: 0,
@@ -47,12 +43,36 @@ impl AppState {
 
         let (ws_tx, _) = broadcast::channel(BROADCAST_CAPACITY);
 
-        Self {
+        let app_state = Self {
             config,
             db,
             game: RwLock::new(initial_state),
             ws_tx,
             api_key_map: RwLock::new(HashMap::new()),
+        };
+
+        app_state.persist_session(session_id, &game_mode);
+
+        app_state
+    }
+
+    /// Persists a new session record to the database. Logs a warning on failure.
+    pub fn persist_session(&self, session_id: Uuid, game_mode: &GameModeConfig) {
+        let started_at = Utc::now().to_rfc3339();
+        let fall_mode = game_mode.fall_mode.to_string();
+        let session_type = game_mode.session_type.to_string();
+        let stage_type = game_mode.stage_type.to_string();
+        if let Err(e) = self.db.create_session(
+            &session_id.to_string(),
+            &fall_mode,
+            &session_type,
+            &stage_type,
+            None,
+            game_mode.goal_height,
+            game_mode.fixed_stage_id.as_deref(),
+            &started_at,
+        ) {
+            tracing::warn!(error = %e, session_id = %session_id, "failed to persist session record");
         }
     }
 
@@ -101,12 +121,12 @@ impl AppState {
         self.broadcast(BroadcastType::PositionUpdate, event.to_string());
     }
 
-    pub fn broadcast_world_reset(&self, mode: GameMode) {
+    pub fn broadcast_world_reset(&self, mode: &GameModeConfig) {
         let event = serde_json::json!({
             "type": "world_reset",
             "timestamp": Utc::now().timestamp_millis(),
             "data": {
-                "game_mode": mode.to_string(),
+                "game_mode": mode,
             },
         });
         self.broadcast(BroadcastType::WorldReset, event.to_string());

@@ -87,31 +87,118 @@ pub struct Rect {
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum GameMode {
+#[serde(rename_all = "PascalCase")]
+pub enum FallMode {
     Checkpoint,
     Hardcore,
 }
 
-impl std::fmt::Display for GameMode {
+impl std::fmt::Display for FallMode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            GameMode::Checkpoint => write!(f, "Checkpoint"),
-            GameMode::Hardcore => write!(f, "Hardcore"),
+            FallMode::Checkpoint => write!(f, "Checkpoint"),
+            FallMode::Hardcore => write!(f, "Hardcore"),
         }
     }
 }
 
-impl std::str::FromStr for GameMode {
+impl std::str::FromStr for FallMode {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "Checkpoint" => Ok(GameMode::Checkpoint),
-            "Hardcore" => Ok(GameMode::Hardcore),
-            other => anyhow::bail!("unknown game mode: {other}"),
+            "Checkpoint" => Ok(FallMode::Checkpoint),
+            "Hardcore" => Ok(FallMode::Hardcore),
+            other => anyhow::bail!("unknown fall_mode: {other}"),
         }
     }
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub enum SessionType {
+    Race,
+    Timetrial,
+    Infinite,
+}
+
+impl std::fmt::Display for SessionType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SessionType::Race => write!(f, "Race"),
+            SessionType::Timetrial => write!(f, "Timetrial"),
+            SessionType::Infinite => write!(f, "Infinite"),
+        }
+    }
+}
+
+impl std::str::FromStr for SessionType {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "Race" => Ok(SessionType::Race),
+            "Timetrial" => Ok(SessionType::Timetrial),
+            "Infinite" => Ok(SessionType::Infinite),
+            other => anyhow::bail!("unknown session_type: {other}"),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub enum StageType {
+    Generated,
+    Fixed,
+}
+
+impl std::fmt::Display for StageType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            StageType::Generated => write!(f, "Generated"),
+            StageType::Fixed => write!(f, "Fixed"),
+        }
+    }
+}
+
+impl std::str::FromStr for StageType {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "Generated" => Ok(StageType::Generated),
+            "Fixed" => Ok(StageType::Fixed),
+            other => anyhow::bail!("unknown stage_type: {other}"),
+        }
+    }
+}
+
+/// Full game mode configuration as per the OpenAPI `GameModeConfig` schema.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct GameModeConfig {
+    pub fall_mode: FallMode,
+    pub session_type: SessionType,
+    pub stage_type: StageType,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fixed_stage_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub goal_height: Option<f64>,
+}
+
+impl Default for GameModeConfig {
+    fn default() -> Self {
+        Self {
+            fall_mode: FallMode::Checkpoint,
+            session_type: SessionType::Infinite,
+            stage_type: StageType::Generated,
+            fixed_stage_id: None,
+            goal_height: None,
+        }
+    }
+}
+
+/// Legacy alias kept for compatibility with config parsing.
+pub type GameMode = FallMode;
 
 // ---------------------------------------------------------------------------
 // SQLite-persisted entities
@@ -131,7 +218,7 @@ pub struct User {
 pub struct Session {
     pub id: Uuid,
     pub user_id: Uuid,
-    pub game_mode: GameMode,
+    pub game_mode: FallMode,
     pub started_at: DateTime<Utc>,
     pub ended_at: Option<DateTime<Utc>>,
 }
@@ -178,7 +265,7 @@ pub struct PlayerState {
 #[derive(Debug, Clone, Serialize)]
 pub struct State {
     pub session_id: Uuid,
-    pub game_mode: GameMode,
+    pub game_mode: GameModeConfig,
     pub world: WorldState,
     pub players: std::collections::HashMap<Uuid, PlayerState>,
 }

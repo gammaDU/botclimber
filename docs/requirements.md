@@ -32,6 +32,7 @@ This directory contains the user stories, architectural designs, and technical s
 - [Architecture: Sequence Diagram](architecture/sequence_diagram.md) - Detailed flow of interactions for Account Management and Bot Gameplay cycles.
 - [Architecture: Data Model](architecture/data_model.md) - Database schema (SQLite) for users, sessions, and high scores, plus in-memory runtime structures.
 - [Architecture: Security Design](architecture/security_design.md) - Details on rate limiting (Token Bucket), authentication (JWT/API Keys), and flood protection.
+- [Frontend Design](frontend_design.md) - Industrial/worn visual theme: color tokens, typography, surface textures, button animations, spectate canvas (platforms as metal grating, bots as industrial cubes with visible internals — cog, glowing core, spring coils — through a recessed viewport).
 - [Architecture: WebSocket Protocol](architecture/websocket_protocol.md) - Full WebSocket stream specification: connection lifecycle, all event types, ping/pong, close codes, and reconnection behaviour.
 - [API Namespace Overview](api_endpoints.md) - Summary of the four API namespaces and their authentication requirements.
 - [OpenAPI Specification](openapi.yaml) - Formal YAML definition of the REST API (OpenAPI 3.0.3); authoritative source of truth for all endpoints.

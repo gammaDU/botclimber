@@ -269,7 +269,19 @@ async fn leave(
             .ok_or(AppError::Conflict("not_joined".into()))?
     };
 
-    state.game.write().await.players.remove(&player_id);
+    let removed = state.game.write().await.players.remove(&player_id);
+
+    // Persist final high score for this player
+    if let Some(player) = removed {
+        let hs_id = format!("{}:{}", player.user_id, player.session_id);
+        let user_id = player.user_id.to_string();
+        let session_id = player.session_id.to_string();
+        let max_height = player.session_max_height;
+        let achieved_at = chrono::Utc::now().to_rfc3339();
+        if let Err(e) = state.db.upsert_high_score(&hs_id, &user_id, &session_id, max_height, &achieved_at) {
+            tracing::warn!(error = %e, player_id = %player_id, "failed to persist high score on leave");
+        }
+    }
 
     state.broadcast_player_left(player_id);
 

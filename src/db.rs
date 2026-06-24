@@ -144,15 +144,19 @@ impl Database {
     pub fn create_session(
         &self,
         id: &str,
-        user_id: &str,
-        game_mode: &str,
+        fall_mode: &str,
+        session_type: &str,
+        stage_type: &str,
+        seed: Option<i64>,
+        goal_height: Option<f64>,
+        fixed_stage_id: Option<&str>,
         started_at: &str,
     ) -> Result<()> {
         let conn = self.conn.lock().unwrap();
         conn.execute(
-            "INSERT INTO sessions (id, user_id, game_mode, started_at)
-             VALUES (?1, ?2, ?3, ?4)",
-            params![id, user_id, game_mode, started_at],
+            "INSERT INTO sessions (id, fall_mode, session_type, stage_type, seed, goal_height, fixed_stage_id, started_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            params![id, fall_mode, session_type, stage_type, seed, goal_height, fixed_stage_id, started_at],
         )?;
         Ok(())
     }
@@ -191,6 +195,7 @@ impl Database {
         &self,
         session_type: Option<&str>,
         stage_type: Option<&str>,
+        fixed_stage_id: Option<&str>,
         session_id: Option<&str>,
         user_id: Option<&str>,
         limit: i64,
@@ -208,6 +213,9 @@ impl Database {
             if stage_type.is_some() {
                 conditions.push("s.stage_type = :stage_type".into());
             }
+            if fixed_stage_id.is_some() {
+                conditions.push("s.fixed_stage_id = :fixed_stage_id".into());
+            }
         }
         if user_id.is_some() {
             conditions.push("h.user_id = :user_id".into());
@@ -220,7 +228,7 @@ impl Database {
         };
 
         let sql = format!(
-            "SELECT u.username, h.max_height, s.game_mode, h.achieved_at
+            "SELECT u.username, h.max_height, s.session_type, h.achieved_at
              FROM high_scores h
              JOIN users u ON u.id = h.user_id
              JOIN sessions s ON s.id = h.session_id
@@ -234,6 +242,7 @@ impl Database {
             rusqlite::named_params! {
                 ":session_type": session_type.unwrap_or(""),
                 ":stage_type": stage_type.unwrap_or(""),
+                ":fixed_stage_id": fixed_stage_id.unwrap_or(""),
                 ":session_id": session_id.unwrap_or(""),
                 ":user_id": user_id.unwrap_or(""),
                 ":limit": limit,
@@ -243,7 +252,7 @@ impl Database {
                 Ok(LeaderboardRow {
                     username: row.get(0)?,
                     max_height: row.get(1)?,
-                    game_mode: row.get(2)?,
+                    session_type: row.get(2)?,
                     achieved_at: row.get(3)?,
                 })
             },
@@ -274,6 +283,6 @@ pub struct UserRow {
 pub struct LeaderboardRow {
     pub username: String,
     pub max_height: f64,
-    pub game_mode: String,
+    pub session_type: String,
     pub achieved_at: String,
 }

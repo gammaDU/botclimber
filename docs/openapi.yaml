@@ -478,6 +478,22 @@ paths:
                 items:
                   $ref: '#/components/schemas/LeaderboardEntry'
 
+  /system/stage:
+    get:
+      tags:
+        - System
+      summary: Get available stages
+      description: Returns the list of stages available for the Fixed stage mode. Each stage has a unique identifier, a human-readable label, and a target height.
+      responses:
+        '200':
+          description: List of available stages.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/StageInfo'
+
   /system/active-players:
     get:
       tags:
@@ -615,6 +631,23 @@ components:
       properties:
         x: { type: number }
         y: { type: number }
+
+    StageInfo:
+      type: object
+      required: [id, label, height]
+      properties:
+        id:
+          type: string
+          description: Unique identifier for the stage.
+          example: default
+        label:
+          type: string
+          description: Human-readable display name for the stage.
+          example: Default
+        height:
+          type: number
+          description: Target height (in world units) that defines the stage goal.
+          example: 100.0
 
     JoinResponse:
       type: object

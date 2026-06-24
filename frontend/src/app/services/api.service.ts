@@ -4,6 +4,12 @@ import { Observable } from 'rxjs';
 
 const BASE = '/api/v1';
 
+export interface StageInfo {
+  id: string;
+  label: string;
+  height: number;
+}
+
 export interface LeaderboardEntry {
   rank: number;
   username: string;
@@ -27,9 +33,17 @@ export interface WorldSnapshot {
 export class ApiService {
   constructor(private http: HttpClient) {}
 
-  getLeaderboard(mode?: string): Observable<LeaderboardEntry[]> {
-    const q = mode ? `?mode=${encodeURIComponent(mode)}` : '';
+  getLeaderboard(sessionType?: string, stageType?: string, fixedStageId?: string): Observable<LeaderboardEntry[]> {
+    const params: string[] = [];
+    if (sessionType) params.push(`session_type=${encodeURIComponent(sessionType)}`);
+    if (stageType)   params.push(`stage_type=${encodeURIComponent(stageType)}`);
+    if (fixedStageId) params.push(`fixed_stage_id=${encodeURIComponent(fixedStageId)}`);
+    const q = params.length ? '?' + params.join('&') : '';
     return this.http.get<LeaderboardEntry[]>(`${BASE}/system/leaderboard${q}`);
+  }
+
+  getStages(): Observable<StageInfo[]> {
+    return this.http.get<StageInfo[]>(`${BASE}/system/stage`);
   }
 
   getSnapshot(): Observable<WorldSnapshot> {

@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use super::ws;
 use crate::error::ApiResult;
+use crate::models::GameModeConfig;
 use crate::state::AppState;
 
 pub fn router() -> Router<Arc<AppState>> {
@@ -16,7 +17,27 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/leaderboard", get(leaderboard))
         .route("/active-players", get(active_players))
         .route("/snapshot", get(snapshot))
+        .route("/stage", get(stages))
         .route("/stream", get(ws::handler))
+}
+
+// ---------------------------------------------------------------------------
+// GET /api/v1/system/stage
+// ---------------------------------------------------------------------------
+
+#[derive(Serialize)]
+struct StageInfo {
+    id: &'static str,
+    label: &'static str,
+    height: f64,
+}
+
+const AVAILABLE_STAGES: &[StageInfo] = &[
+    StageInfo { id: "default", label: "Default", height: 100.0 },
+];
+
+async fn stages() -> Json<&'static [StageInfo]> {
+    Json(AVAILABLE_STAGES)
 }
 
 // ---------------------------------------------------------------------------
@@ -27,6 +48,7 @@ pub fn router() -> Router<Arc<AppState>> {
 struct LeaderboardQuery {
     session_type: Option<String>,
     stage_type: Option<String>,
+    fixed_stage_id: Option<String>,
     session_id: Option<String>,
     user_id: Option<String>,
     #[serde(default = "default_limit")]
@@ -43,7 +65,7 @@ fn default_limit() -> i64 {
 struct LeaderboardEntry {
     username: String,
     max_height: f64,
-    game_mode: String,
+    session_type: String,
     achieved_at: String,
 }
 
@@ -54,6 +76,7 @@ async fn leaderboard(
     let rows = state.db.get_leaderboard(
         params.session_type.as_deref(),
         params.stage_type.as_deref(),
+        params.fixed_stage_id.as_deref(),
         params.session_id.as_deref(),
         params.user_id.as_deref(),
         params.limit,
@@ -65,7 +88,7 @@ async fn leaderboard(
         .map(|r| LeaderboardEntry {
             username: r.username,
             max_height: r.max_height,
-            game_mode: r.game_mode,
+            session_type: r.session_type,
             achieved_at: r.achieved_at,
         })
         .collect();
@@ -130,7 +153,7 @@ struct PositionBody {
 struct WorldSnapshot {
     timestamp: i64,
     session_id: String,
-    game_mode: String,
+    game_mode: GameModeConfig,
     tick: u64,
     players: Vec<SnapshotPlayerEntry>,
     platforms: Vec<serde_json::Value>,
@@ -170,7 +193,7 @@ async fn snapshot(State(state): State<Arc<AppState>>) -> ApiResult<Json<WorldSna
     Ok(Json(WorldSnapshot {
         timestamp: chrono::Utc::now().timestamp_millis(),
         session_id: game.session_id.to_string(),
-        game_mode: game.game_mode.to_string(),
+        game_mode: game.game_mode.clone(),
         tick: game.world.tick,
         players,
         platforms,

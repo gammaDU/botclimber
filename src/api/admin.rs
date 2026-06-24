@@ -10,7 +10,7 @@ use uuid::Uuid;
 
 use crate::api::auth::AdminUser;
 use crate::error::{ApiResult, AppError};
-use crate::models::GameMode;
+use crate::models::{FallMode, GameModeConfig, SessionType, StageType};
 use crate::state::AppState;
 
 pub fn router() -> Router<Arc<AppState>> {
@@ -39,28 +39,33 @@ async fn set_mode(
     AdminUser(_claims): AdminUser,
     State(state): State<Arc<AppState>>,
     Json(body): Json<SetModeRequest>,
-) -> ApiResult<Json<serde_json::Value>> {
+) -> ApiResult<Json<GameModeConfig>> {
     let mut game = state.game.write().await;
 
-    if let Some(ref fall_mode) = body.fall_mode {
-        let mode: GameMode = fall_mode
-            .parse()
+    if let Some(ref s) = body.fall_mode {
+        game.game_mode.fall_mode = s
+            .parse::<FallMode>()
             .map_err(|_| AppError::BadRequest("invalid fall_mode".into()))?;
-        game.game_mode = mode;
     }
+    if let Some(ref s) = body.session_type {
+        game.game_mode.session_type = s
+            .parse::<SessionType>()
+            .map_err(|_| AppError::BadRequest("invalid session_type".into()))?;
+    }
+    if let Some(ref s) = body.stage_type {
+        game.game_mode.stage_type = s
+            .parse::<StageType>()
+            .map_err(|_| AppError::BadRequest("invalid stage_type".into()))?;
+    }
+    game.game_mode.fixed_stage_id = body.fixed_stage_id.clone();
+    game.game_mode.goal_height = body.goal_height;
 
-    let current_mode = game.game_mode;
+    let current_mode = game.game_mode.clone();
     drop(game);
 
-    state.broadcast_world_reset(current_mode);
+    state.broadcast_world_reset(&current_mode);
 
-    Ok(Json(serde_json::json!({
-        "fall_mode": current_mode.to_string(),
-        "session_type": body.session_type,
-        "stage_type": body.stage_type,
-        "fixed_stage_id": body.fixed_stage_id,
-        "goal_height": body.goal_height,
-    })))
+    Ok(Json(current_mode))
 }
 
 // ---------------------------------------------------------------------------
@@ -94,12 +99,18 @@ async fn world_reset(
     use crate::game::world::initial_platforms;
 
     let mut game = state.game.write().await;
+    game.session_id = Uuid::new_v4();
     game.world.platforms = initial_platforms();
     game.world.tick = 0;
     game.world.seed = 0; // TODO: generate new seed on world reset
     game.players.clear();
 
-    state.broadcast_world_reset(game.game_mode);
+    let new_session_id = game.session_id;
+    let game_mode = game.game_mode.clone();
+    drop(game);
+
+    state.persist_session(new_session_id, &game_mode);
+    state.broadcast_world_reset(&game_mode);
 
     Ok(Json(serde_json::json!({ "status": "ok" })))
 }
