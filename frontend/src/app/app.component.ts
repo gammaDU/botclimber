@@ -11,6 +11,7 @@ import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
       <nav id="nav">
         <a routerLink="/spectate"    routerLinkActive="active" class="nav-btn">Spectate</a>
         <a routerLink="/account"     routerLinkActive="active" class="nav-btn">Account</a>
+        <a href="/assets/api-docs.html" target="_blank" class="nav-btn">Documentation</a>
       </nav>
     </header>
     <main>

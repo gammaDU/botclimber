@@ -144,6 +144,38 @@ impl Bot {
         Ok(res)
     }
 
+    pub async fn leave(&self) -> Result<()> {
+        let resp = self
+            .client
+            .post(format!("{}/api/v1/bot/leave", self.base_url))
+            .header("X-API-Key", &self.key)
+            .send()
+            .await
+            .context("leave request failed")?;
+
+        if !resp.status().is_success() {
+            let body = resp.text().await.unwrap_or_default();
+            anyhow::bail!("Leave failed: {body}");
+        }
+        Ok(())
+    }
+
+    pub async fn reset(&self) -> Result<()> {
+        let resp = self
+            .client
+            .post(format!("{}/api/v1/bot/reset", self.base_url))
+            .header("X-API-Key", &self.key)
+            .send()
+            .await
+            .context("reset request failed")?;
+
+        if !resp.status().is_success() {
+            let body = resp.text().await.unwrap_or_default();
+            anyhow::bail!("Reset failed: {body}");
+        }
+        Ok(())
+    }
+
     pub async fn state(&self) -> Result<StateResponse> {
         let state = self
             .client

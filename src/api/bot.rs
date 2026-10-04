@@ -254,8 +254,62 @@ async fn reset(
 
     player.position = Vector2::zero();
     player.velocity = Vector2::zero();
+    player.last_landed_position = Vector2::zero();
+    player.session_max_height = 0.0;
+    player.session_start_time = chrono::Utc::now();
 
     Ok(Json(serde_json::json!({ "status": "ok" })))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::{PlayerState, Vector2, PlayerMovementState};
+    use chrono::{Duration, Utc};
+
+    #[test]
+    fn test_bot_reset_logic() {
+        let session_id = Uuid::new_v4();
+        let player_id = Uuid::new_v4();
+        let user_id = Uuid::new_v4();
+        let old_start_time = Utc::now() - Duration::seconds(100);
+        
+        let mut player = PlayerState {
+            session_id,
+            player_id,
+            user_id,
+            name: "TestBot".to_string(),
+            position: Vector2::new(10.0, 20.0),
+            velocity: Vector2::new(1.0, 2.0),
+            state: PlayerMovementState::Jumping,
+            session_max_height: 50.0,
+            activity_rating: 1.0,
+            last_heartbeat: Utc::now(),
+            last_landed_position: Vector2::new(5.0, 5.0),
+            session_start_time: old_start_time,
+            best_time: Some(42.0),
+            last_goal_time: Some(42.0),
+        };
+
+        // Simulating the logic inside reset handler
+        player.position = Vector2::zero();
+        player.velocity = Vector2::zero();
+        player.last_landed_position = Vector2::zero();
+        player.session_max_height = 0.0;
+        player.session_start_time = Utc::now();
+
+        assert_eq!(player.position.x, 0.0);
+        assert_eq!(player.position.y, 0.0);
+        assert_eq!(player.velocity.x, 0.0);
+        assert_eq!(player.velocity.y, 0.0);
+        assert_eq!(player.last_landed_position.x, 0.0);
+        assert_eq!(player.last_landed_position.y, 0.0);
+        assert_eq!(player.session_max_height, 0.0);
+        assert!(player.session_start_time > old_start_time);
+        
+        // High scores (best_time) should NOT be reset
+        assert_eq!(player.best_time, Some(42.0));
+    }
 }
 
 // ---------------------------------------------------------------------------

@@ -43,6 +43,7 @@ async fn main() -> Result<()> {
     println!("================");
 
     // 2. Jump loop
+    let mut counter = 2;
     loop {
         sleep(Duration::from_secs(1)).await;
 
@@ -73,6 +74,7 @@ async fn main() -> Result<()> {
         let jump = calc_jump(state.position, target);
         if let Some((angle_deg, strength)) = jump {
             println!("Jumping to {target} (angle_deg={angle_deg}, strength={strength})");
+            sleep(Duration::from_secs(1)).await;
             bot.jump(angle_deg, strength).await?;
         }
     }
@@ -106,7 +108,11 @@ pub fn calc_jump(origin: Vector2, target: Vector2) -> Option<(f64, f64)> {
         if best.is_none() || strength < best.unwrap().1 {
             // angle_deg: 0 = up (+y), clockwise → atan2(vx, vy)
             let angle_deg = vx.atan2(vy).to_degrees();
-            let angle_deg = if angle_deg < 0.0 { angle_deg + 360.0 } else { angle_deg };
+            let angle_deg = if angle_deg < 0.0 {
+                angle_deg + 360.0
+            } else {
+                angle_deg
+            };
             best = Some((angle_deg, strength));
         }
     }

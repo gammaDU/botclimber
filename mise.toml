@@ -38,3 +38,7 @@ description = "Start the Angular dev server with API proxy (http://localhost:420
 dir = "frontend"
 run = "npm start"
 depends = ["frontend-install"]
+
+[tasks.docs-build]
+description = "Compile OpenAPI definitions to a static HTML file"
+run = "npx @redocly/cli build-docs docs/openapi.yaml -o frontend/src/assets/api-docs.html"
