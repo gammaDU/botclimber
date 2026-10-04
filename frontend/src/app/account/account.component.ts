@@ -2,7 +2,7 @@ import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { AuthService, UserProfile } from '../services/auth.service';
-import { AdminService, GameModeConfig } from '../services/admin.service';
+import { AdminService, GameModeConfig, FixedStageInfo } from '../services/admin.service';
 
 @Component({
   selector: 'app-account',
@@ -145,7 +145,11 @@ import { AdminService, GameModeConfig } from '../services/admin.service';
           </label>
           <label *ngIf="adminMode.stage_type === 'Fixed'">
             Fixed Stage ID
-            <input type="text" [(ngModel)]="adminMode.fixed_stage_id" name="fixed_stage_id" />
+            <select [(ngModel)]="adminMode.fixed_stage_id" name="fixed_stage_id">
+              <option *ngFor="let stage of availableStages" [value]="stage.id">
+                {{ stage.name }} ({{ stage.id }})
+              </option>
+            </select>
           </label>
           <label *ngIf="adminMode.stage_type === 'Generated' && adminMode.session_type !== 'Infinite'">
             Goal Height
@@ -211,10 +215,42 @@ export class AccountComponent implements OnInit {
   adminPlayersError = '';
   adminPlayersSuccess = '';
 
+  availableStages: FixedStageInfo[] = [];
+
   constructor(readonly auth: AuthService, private admin: AdminService, private cd: ChangeDetectorRef) {}
 
   ngOnInit(): void {
-    if (this.auth.isLoggedIn()) this.loadProfile();
+    if (this.auth.isLoggedIn()) {
+      this.loadProfile();
+      this.loadAvailableStages();
+      this.loadCurrentMode();
+    }
+  }
+
+  loadCurrentMode(): void {
+    this.admin.getMode().subscribe({
+      next: (mode) => {
+        this.adminMode = { ...this.adminMode, ...mode };
+        this.cd.markForCheck();
+      },
+      error: (err) => {
+        console.error('Failed to load current game mode', err);
+      }
+    });
+  }
+
+  loadAvailableStages(): void {
+    this.admin.getStages().subscribe({
+      next: (stages) => {
+        this.availableStages = stages;
+        if (stages.length > 0 && !this.adminMode.fixed_stage_id) {
+          this.adminMode.fixed_stage_id = stages[0].id;
+        }
+      },
+      error: (err) => {
+        console.error('Failed to load stages', err);
+      }
+    });
   }
 
   register(): void {

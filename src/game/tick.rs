@@ -24,9 +24,13 @@ pub fn spawn(state: Arc<AppState>) {
             let platforms = game.world.platforms.clone();
 
             let mut dead_players: Vec<uuid::Uuid> = Vec::new();
+            let mut reset_players: Vec<uuid::Uuid> = Vec::new();
 
             // Collect high-score updates: (hs_id, user_id, session_id, max_height)
             let mut hs_updates: Vec<(String, String, String, f64)> = Vec::new();
+
+            let session_type = game.game_mode.session_type;
+            let goal_height = game.game_mode.goal_height.unwrap_or(f64::INFINITY);
 
             for (player_id, player) in game.players.iter_mut() {
                 let prev_max = player.session_max_height;
@@ -34,6 +38,19 @@ pub fn spawn(state: Arc<AppState>) {
                 if died {
                     dead_players.push(*player_id);
                 }
+
+                // Time trial logic: check for goal reach
+                if session_type == crate::models::SessionType::Timetrial && player.position.y >= goal_height {
+                    let now = Utc::now();
+                    let duration = (now - player.session_start_time).num_milliseconds() as f64 / 1000.0;
+                    player.last_goal_time = Some(duration);
+                    if player.best_time.map_or(true, |t| duration < t) {
+                        player.best_time = Some(duration);
+                    }
+                    player.session_start_time = now;
+                    reset_players.push(*player_id);
+                }
+
                 // Persist whenever the player sets a new personal best this session
                 if player.session_max_height > prev_max {
                     let hs_id = format!("{}:{}", player.user_id, player.session_id);
@@ -49,6 +66,8 @@ pub fn spawn(state: Arc<AppState>) {
                     player.position,
                     player.velocity,
                     player.state,
+                    player.session_start_time,
+                    player.best_time,
                 );
             }
 
@@ -58,6 +77,17 @@ pub fn spawn(state: Arc<AppState>) {
                     player.position = player.last_landed_position;
                     player.velocity = crate::models::Vector2::zero();
                     player.session_max_height = player.position.y;
+                    player.state = crate::models::PlayerMovementState::Landed;
+                }
+            }
+
+            // Reset players who reached the goal in Timetrial mode
+            for player_id in reset_players {
+                if let Some(player) = game.players.get_mut(&player_id) {
+                    player.position = crate::models::Vector2::zero();
+                    player.velocity = crate::models::Vector2::zero();
+                    player.last_landed_position = crate::models::Vector2::zero();
+                    player.session_max_height = 0.0;
                     player.state = crate::models::PlayerMovementState::Landed;
                 }
             }

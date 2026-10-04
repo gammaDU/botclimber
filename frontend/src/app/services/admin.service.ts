@@ -12,9 +12,22 @@ export interface GameModeConfig {
   goal_height?: number;
 }
 
+export interface FixedStageInfo {
+  id: string;
+  name: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class AdminService {
   constructor(private http: HttpClient) {}
+
+  getStages(): Observable<FixedStageInfo[]> {
+    return this.http.get<FixedStageInfo[]>(`${BASE}/stages`);
+  }
+
+  getMode(): Observable<GameModeConfig> {
+    return this.http.get<GameModeConfig>(`${BASE}/mode`);
+  }
 
   setMode(config: GameModeConfig): Observable<GameModeConfig> {
     return this.http.post<GameModeConfig>(`${BASE}/mode`, config);

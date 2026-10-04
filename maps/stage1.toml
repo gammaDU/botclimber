@@ -1,0 +1,10 @@
+id = "stage1"
+name = "Stage 1"
+goal_height = 20.0
+platforms = [
+    { bottom_left = [5.0, 0.0], top_right = [10.0, 5.0] },
+    { bottom_left = [-10.0, 5.0], top_right = [-2.0, 6.0] },
+    { bottom_left = [2.0, 10.0], top_right = [8.0, 11.0] },
+    { bottom_left = [-3.0, 15.0], top_right = [3.0, 16.0] },
+    { bottom_left = [-10.0, 19.0], top_right = [0.0, 20.0] }
+]

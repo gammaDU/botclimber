@@ -93,6 +93,9 @@ async fn join(
         activity_rating: 0.0,
         last_heartbeat: Utc::now(),
         last_landed_position: Vector2::zero(),
+        session_start_time: Utc::now(),
+        best_time: None,
+        last_goal_time: None,
     };
 
     state.game.write().await.players.insert(player_id, player);
@@ -209,6 +212,8 @@ async fn state(
         "dimensions": { "x": physics::PLAYER_WIDTH, "y": physics::PLAYER_HEIGHT },
         "session_max_height": player.session_max_height,
         "state": format!("{:?}", player.state),
+        "current_time": (chrono::Utc::now() - player.session_start_time).num_milliseconds() as f64 / 1000.0,
+        "best_time": player.best_time,
         "surrounding_platforms": surrounding_platforms,
     })))
 }

@@ -74,12 +74,27 @@ impl MulAssign<f64> for Vector2 {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Rect {
     pub x: f64,
     pub y: f64,
     pub width: f64,
     pub height: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FixedStagePlatform {
+    pub bottom_left: [f64; 2],
+    pub top_right: [f64; 2],
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FixedStage {
+    #[serde(default)]
+    pub id: String,
+    pub name: String,
+    pub goal_height: f64,
+    pub platforms: Vec<FixedStagePlatform>,
 }
 
 // ---------------------------------------------------------------------------
@@ -259,6 +274,9 @@ pub struct PlayerState {
     pub activity_rating: f64,
     pub last_heartbeat: DateTime<Utc>,
     pub last_landed_position: Vector2,
+    pub session_start_time: DateTime<Utc>,
+    pub best_time: Option<f64>,
+    pub last_goal_time: Option<f64>,
 }
 
 /// Top-level game state container (§2.2).

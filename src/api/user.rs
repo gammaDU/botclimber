@@ -117,7 +117,7 @@ async fn login(
     let token = encode_jwt(
         &user_id,
         &row.username,
-        false,
+        row.is_admin,
         &state.config.auth.jwt_secret,
         state.config.auth.jwt_expiry_secs,
     )?;

@@ -141,6 +141,8 @@ struct SnapshotPlayerEntry {
     position: PositionBody,
     velocity: PositionBody,
     state: String,
+    current_time: f64,
+    best_time: Option<f64>,
 }
 
 #[derive(Serialize)]
@@ -165,18 +167,24 @@ async fn snapshot(State(state): State<Arc<AppState>>) -> ApiResult<Json<WorldSna
     let players = game
         .players
         .iter()
-        .map(|(id, p)| SnapshotPlayerEntry {
-            player_id: id.to_string(),
-            name: p.name.clone(),
-            position: PositionBody {
-                x: p.position.x,
-                y: p.position.y,
-            },
-            velocity: PositionBody {
-                x: p.velocity.x,
-                y: p.velocity.y,
-            },
-            state: format!("{:?}", p.state),
+        .map(|(id, p)| {
+            let now = chrono::Utc::now();
+            let current_time = (now - p.session_start_time).num_milliseconds() as f64 / 1000.0;
+            SnapshotPlayerEntry {
+                player_id: id.to_string(),
+                name: p.name.clone(),
+                position: PositionBody {
+                    x: p.position.x,
+                    y: p.position.y,
+                },
+                velocity: PositionBody {
+                    x: p.velocity.x,
+                    y: p.velocity.y,
+                },
+                state: format!("{:?}", p.state),
+                current_time,
+                best_time: p.best_time,
+            }
         })
         .collect();
 

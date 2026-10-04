@@ -15,11 +15,51 @@ use crate::state::AppState;
 
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()
-        .route("/mode", post(set_mode))
+        .route("/mode", axum::routing::get(get_mode).post(set_mode))
+        .route("/stages", axum::routing::get(get_stages))
         .route("/ratelimits", post(set_ratelimits))
         .route("/world/reset", post(world_reset))
         .route("/players/reset", post(players_reset))
         .route("/players/{id}/reset", post(player_reset))
+}
+
+// ---------------------------------------------------------------------------
+// GET /api/v1/admin/stages
+// ---------------------------------------------------------------------------
+
+#[derive(serde::Serialize)]
+struct FixedStageInfo {
+    id: String,
+    name: String,
+}
+
+async fn get_stages(
+    AdminUser(_claims): AdminUser,
+    State(state): State<Arc<AppState>>,
+) -> ApiResult<Json<Vec<FixedStageInfo>>> {
+    let stages = state
+        .config
+        .fixed_stages
+        .iter()
+        .map(|s| FixedStageInfo {
+            id: s.id.clone(),
+            name: s.name.clone(),
+        })
+        .collect();
+    Ok(Json(stages))
+}
+
+// ---------------------------------------------------------------------------
+// GET /api/v1/admin/mode
+// ---------------------------------------------------------------------------
+
+async fn get_mode(
+    AdminUser(_claims): AdminUser,
+    State(state): State<Arc<AppState>>,
+) -> ApiResult<Json<GameModeConfig>> {
+    let game = state.game.read().await;
+    let mode = game.game_mode.clone();
+    Ok(Json(mode))
 }
 
 // ---------------------------------------------------------------------------
@@ -60,6 +100,18 @@ async fn set_mode(
     game.game_mode.fixed_stage_id = body.fixed_stage_id.clone();
     game.game_mode.goal_height = body.goal_height;
 
+    // Load platforms if switching to a fixed stage
+    if game.game_mode.stage_type == StageType::Fixed {
+        if let Some(ref stage_id) = game.game_mode.fixed_stage_id {
+            if let Some(stage) = state.config.fixed_stages.iter().find(|s| &s.id == stage_id) {
+                game.game_mode.goal_height = Some(stage.goal_height);
+                game.world.platforms = crate::game::world::platforms_from_fixed_stage(stage);
+            }
+        }
+    } else if game.game_mode.stage_type == StageType::Generated {
+        game.world.platforms = crate::game::world::initial_platforms();
+    }
+
     let current_mode = game.game_mode.clone();
     drop(game);
 
@@ -96,11 +148,31 @@ async fn world_reset(
     AdminUser(_claims): AdminUser,
     State(state): State<Arc<AppState>>,
 ) -> ApiResult<Json<serde_json::Value>> {
-    use crate::game::world::initial_platforms;
+    use crate::game::world::{initial_platforms, platforms_from_fixed_stage};
 
     let mut game = state.game.write().await;
     game.session_id = Uuid::new_v4();
-    game.world.platforms = initial_platforms();
+
+    // Re-verify the fixed stage if the game mode is set to Fixed.
+    if game.game_mode.stage_type == StageType::Fixed {
+        if let Some(ref stage_id) = game.game_mode.fixed_stage_id {
+            if let Some(stage) = state.config.fixed_stages.iter().find(|s| &s.id == stage_id) {
+                game.game_mode.goal_height = Some(stage.goal_height);
+                game.world.platforms = platforms_from_fixed_stage(stage);
+            } else {
+                // If stage_id not found in config, fallback to generated.
+                game.game_mode.stage_type = StageType::Generated;
+                game.world.platforms = initial_platforms();
+            }
+        } else {
+            // No stage_id provided, fallback to generated.
+            game.game_mode.stage_type = StageType::Generated;
+            game.world.platforms = initial_platforms();
+        }
+    } else {
+        game.world.platforms = initial_platforms();
+    }
+
     game.world.tick = 0;
     game.world.seed = 0; // TODO: generate new seed on world reset
     game.players.clear();
@@ -138,7 +210,10 @@ async fn player_reset(
 ) -> ApiResult<Json<serde_json::Value>> {
     let mut game = state.game.write().await;
     let player = game.players.get_mut(&id).ok_or(AppError::NotFound)?;
-    player.position = player.last_landed_position;
+    player.position = crate::models::Vector2::zero();
     player.velocity = crate::models::Vector2::zero();
+    player.last_landed_position = crate::models::Vector2::zero();
+    player.session_max_height = 0.0;
+    player.session_start_time = chrono::Utc::now();
     Ok(Json(serde_json::json!({ "status": "ok" })))
 }

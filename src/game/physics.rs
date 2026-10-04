@@ -197,6 +197,9 @@ mod tests {
             activity_rating: 0.0,
             last_heartbeat: Utc::now(),
             last_landed_position: Vector2::zero(),
+            session_start_time: Utc::now(),
+            best_time: None,
+            last_goal_time: None,
         }
     }
 

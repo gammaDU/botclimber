@@ -8,7 +8,7 @@ use uuid::Uuid;
 use crate::config::AppConfig;
 use crate::db::Database;
 use crate::game::world;
-use crate::models::{GameModeConfig, PlayerMovementState, State, Vector2, WorldState};
+use crate::models::{GameModeConfig, State, WorldState, StageType};
 
 /// Capacity of the broadcast channel for WebSocket events.
 const BROADCAST_CAPACITY: usize = 256;
@@ -29,12 +29,51 @@ pub struct AppState {
 impl AppState {
     pub fn new(config: AppConfig, db: Database) -> Self {
         let session_id = Uuid::new_v4();
-        let game_mode = GameModeConfig::default();
+        let mut game_mode = GameModeConfig::default();
+
+        // Allow overriding the default game mode from config.
+        if config.game.default_game_mode == "Hardcore" {
+            game_mode.fall_mode = crate::models::FallMode::Hardcore;
+        }
+
+        if let Ok(st) = config.game.default_session_type.parse() {
+            game_mode.session_type = st;
+        }
+
+        if let Ok(st) = config.game.default_stage_type.parse() {
+            game_mode.stage_type = st;
+        }
+
+        if let Some(ref stage_id) = config.game.default_stage_id {
+            game_mode.fixed_stage_id = Some(stage_id.clone());
+        }
+
+        // Handle stage configuration
+        let platforms = if game_mode.stage_type == StageType::Fixed {
+            let stage = if let Some(ref sid) = game_mode.fixed_stage_id {
+                config.fixed_stages.iter().find(|s| &s.id == sid)
+            } else {
+                config.fixed_stages.first()
+            };
+
+            if let Some(stage) = stage {
+                game_mode.fixed_stage_id = Some(stage.id.clone());
+                game_mode.goal_height = Some(stage.goal_height);
+                world::platforms_from_fixed_stage(stage)
+            } else {
+                // Fallback if fixed stage not found
+                game_mode.stage_type = StageType::Generated;
+                world::initial_platforms()
+            }
+        } else {
+            world::initial_platforms()
+        };
+
         let initial_state = State {
             session_id,
             game_mode: game_mode.clone(),
             world: WorldState {
-                platforms: world::initial_platforms(),
+                platforms,
                 tick: 0,
                 seed: 0, // TODO: generate or load seed for deterministic world generation
             },
@@ -102,13 +141,17 @@ impl AppState {
     pub fn broadcast_position_update(
         &self,
         player_id: Uuid,
-        position: Vector2,
-        velocity: Vector2,
-        state: PlayerMovementState,
+        position: crate::models::Vector2,
+        velocity: crate::models::Vector2,
+        state: crate::models::PlayerMovementState,
+        session_start_time: chrono::DateTime<chrono::Utc>,
+        best_time: Option<f64>,
     ) {
+        let now = chrono::Utc::now();
+        let current_time = (now - session_start_time).num_milliseconds() as f64 / 1000.0;
         let event = serde_json::json!({
             "type": "position_update",
-            "timestamp": Utc::now().timestamp_millis(),
+            "timestamp": now.timestamp_millis(),
             "data": {
                 "player_id": player_id.to_string(),
                 "x": position.x,
@@ -116,6 +159,8 @@ impl AppState {
                 "vx": velocity.x,
                 "vy": velocity.y,
                 "state": format!("{:?}", state).to_uppercase(),
+                "current_time": current_time,
+                "best_time": best_time,
             }
         });
         self.broadcast(BroadcastType::PositionUpdate, event.to_string());

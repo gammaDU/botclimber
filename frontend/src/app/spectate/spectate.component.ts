@@ -18,6 +18,8 @@ interface PlayerState {
   x: number; y: number;
   vx: number; vy: number;
   state: 'LANDED' | 'JUMPING';
+  current_time?: number;
+  best_time?: number;
 }
 
 interface GameModeConfig {
@@ -37,6 +39,8 @@ interface SnapshotResponse {
     position: { x: number; y: number };
     velocity: { x: number; y: number };
     state: string;
+    current_time: number;
+    best_time?: number;
   }>;
   platforms: Array<{ id: string; rect: { x: number; y: number; width: number; height: number } }>;
 }
@@ -97,9 +101,21 @@ function hashCode(s: string): number {
                   <h2>Active Players</h2>
                   <ul id="session-list">
                       @for (p of playerList; track p.player_id) {
-                          <li [class.following]="followId === p.player_id" (click)="follow(p.player_id)">
-                              <span>{{ p.name }}</span>
-                              <span>{{ p.y | number:'1.1-1' }} m</span>
+                          <li [class.following]="followId === p.player_id" (click)="follow(p.player_id)" style="flex-direction: column; align-items: stretch;">
+                              <div style="display: flex; justify-content: space-between; width: 100%;">
+                                  <span>{{ p.name }}</span>
+                              </div>
+                              <div style="font-size: 0.8rem; color: var(--text-muted); display: flex; justify-content: space-between; align-items: center; margin-top: 2px;">
+                                  <div style="display: flex; gap: 8px;">
+                                      <span>{{ p.y | number:'1.1-1' }} m</span>
+                                      @if (currentGameMode?.session_type === 'Timetrial') {
+                                          <span>{{ p.current_time | number:'1.1-1' }}s</span>
+                                      }
+                                  </div>
+                                  @if (currentGameMode?.session_type === 'Timetrial' && p.best_time != null) {
+                                      <span>🏆 {{ p.best_time | number:'1.1-1' }}s</span>
+                                  }
+                              </div>
                           </li>
                       } @empty {
                           <li style="color:var(--text-muted)">No active players</li>
@@ -139,7 +155,17 @@ export class SpectateComponent implements OnInit, AfterViewInit, OnDestroy {
   private colorCounter = 0;
 
   private _syncPlayerList(): void {
-    this.playerList = Array.from(this.players.values()).sort((a, b) => b.y - a.y);
+    this.playerList = Array.from(this.players.values()).sort((a, b) => {
+      // Sort by best_time (ascending, lower is better)
+      if (a.best_time != null && b.best_time != null) {
+        return a.best_time - b.best_time;
+      }
+      if (a.best_time != null) return -1;
+      if (b.best_time != null) return 1;
+
+      // Fallback to height (descending, higher is better)
+      return b.y - a.y;
+    });
   }
 
   /** Events buffered before the snapshot arrives. */
@@ -206,11 +232,10 @@ export class SpectateComponent implements OnInit, AfterViewInit, OnDestroy {
     e.preventDefault();
     // deltaY > 0 = scroll down → move camera down (lower camY)
     this.camY -= e.deltaY / WORLD_SCALE;
-    // Clamp: never below world origin, never above the topmost platform
-    const maxCamY = this.platforms.size > 0
-      ? Math.max(...Array.from(this.platforms.values()).map(p => p.rect.y + p.rect.height))
-      : 0;
-    this.camY = Math.max(0, Math.min(this.camY, maxCamY));
+    // Explicitly clamp to 0 and round to prevent floating point drift below 0
+    if (this.camY < 0.0001) {
+      this.camY = 0;
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -242,6 +267,8 @@ export class SpectateComponent implements OnInit, AfterViewInit, OnDestroy {
             vx: p.velocity.x,
             vy: p.velocity.y,
             state: p.state as 'LANDED' | 'JUMPING',
+            current_time: p.current_time,
+            best_time: p.best_time,
           });
           if (!this.playerColorIndex.has(p.player_id)) {
             this.playerColorIndex.set(p.player_id, this.colorCounter++ % BOT_COLORS.length);
@@ -296,6 +323,8 @@ export class SpectateComponent implements OnInit, AfterViewInit, OnDestroy {
           vx: d['vx'] as number,
           vy: d['vy'] as number,
           state: d['state'] as 'LANDED' | 'JUMPING',
+          current_time: d['current_time'] as number,
+          best_time: d['best_time'] as number,
         });
         break;
       }
@@ -315,6 +344,7 @@ export class SpectateComponent implements OnInit, AfterViewInit, OnDestroy {
             name: d['name'] as string,
             x: 0, y: 0, vx: 0, vy: 0,
             state: 'LANDED',
+            current_time: 0,
           });
           this.playerColorIndex.set(id, this.colorCounter++ % BOT_COLORS.length);
         }
@@ -385,7 +415,14 @@ export class SpectateComponent implements OnInit, AfterViewInit, OnDestroy {
     // Update camera
     if (this.followId) {
       const ps = this.players.get(this.followId);
-      if (ps) this.camY = ps.y - (CANVAS_H / 2) / WORLD_SCALE;
+      if (ps) {
+        this.camY = ps.y - (CANVAS_H / 2) / WORLD_SCALE;
+      }
+    }
+
+    // Explicitly clamp to 0 and round to prevent floating point drift below 0
+    if (this.camY < 0.0001) {
+      this.camY = 0;
     }
 
     const toScreenX = (wx: number) => wx * WORLD_SCALE + CANVAS_W / 2;

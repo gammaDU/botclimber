@@ -64,6 +64,35 @@ pub fn decode_jwt(token: &str, secret: &str) -> Result<Claims, AppError> {
     .map_err(|_| AppError::Unauthorized)
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_encode_decode_jwt_admin() {
+        let user_id = Uuid::new_v4();
+        let secret = "secret-key-at-least-32-chars-long-x";
+        let token = encode_jwt(&user_id, "admin", true, secret, 3600).unwrap();
+        let claims = decode_jwt(&token, secret).unwrap();
+
+        assert_eq!(claims.sub, user_id.to_string());
+        assert_eq!(claims.username, "admin");
+        assert!(claims.admin);
+    }
+
+    #[test]
+    fn test_encode_decode_jwt_user() {
+        let user_id = Uuid::new_v4();
+        let secret = "secret-key-at-least-32-chars-long-x";
+        let token = encode_jwt(&user_id, "user", false, secret, 3600).unwrap();
+        let claims = decode_jwt(&token, secret).unwrap();
+
+        assert_eq!(claims.sub, user_id.to_string());
+        assert_eq!(claims.username, "user");
+        assert!(!claims.admin);
+    }
+}
+
 // ---------------------------------------------------------------------------
 // API key generation and hashing
 // ---------------------------------------------------------------------------

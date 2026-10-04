@@ -8,7 +8,7 @@
 ///     as the highest player climbs.
 use uuid::Uuid;
 
-use crate::models::{Platform, Rect};
+use crate::models::{FixedStage, Platform, Rect};
 
 /// Horizontal positions (centre X) for the three-slot repeating pattern.
 const PATTERN_X: &[f64] = &[-8.0, 0.0, 8.0];
@@ -42,6 +42,22 @@ pub fn extend_platforms(existing: &[Platform], highest_y: f64) -> Vec<Platform> 
     let last_index = ((needed_top / VERTICAL_STEP).ceil() as u32) + 1;
 
     generate_range(next_index, last_index)
+}
+
+pub fn platforms_from_fixed_stage(stage: &FixedStage) -> Vec<Platform> {
+    stage
+        .platforms
+        .iter()
+        .map(|p| Platform {
+            id: Uuid::new_v4(),
+            rect: Rect {
+                x: p.bottom_left[0],
+                y: p.bottom_left[1],
+                width: p.top_right[0] - p.bottom_left[0],
+                height: p.top_right[1] - p.bottom_left[1],
+            },
+        })
+        .collect()
 }
 
 fn generate_range(from: u32, to: u32) -> Vec<Platform> {
@@ -103,5 +119,37 @@ mod tests {
             new.is_empty(),
             "no new platforms needed when lookahead is satisfied"
         );
+    }
+
+    #[test]
+    fn test_platforms_from_fixed_stage() {
+        use crate::models::FixedStagePlatform;
+        let stage = FixedStage {
+            id: "test".into(),
+            name: "Test Stage".into(),
+            goal_height: 100.0,
+            platforms: vec![
+                FixedStagePlatform {
+                    bottom_left: [0.0, 0.0],
+                    top_right: [10.0, 2.0],
+                },
+                FixedStagePlatform {
+                    bottom_left: [5.0, 10.0],
+                    top_right: [15.0, 12.0],
+                },
+            ],
+        };
+
+        let platforms = platforms_from_fixed_stage(&stage);
+        assert_eq!(platforms.len(), 2);
+        assert_eq!(platforms[0].rect.x, 0.0);
+        assert_eq!(platforms[0].rect.y, 0.0);
+        assert_eq!(platforms[0].rect.width, 10.0);
+        assert_eq!(platforms[0].rect.height, 2.0);
+
+        assert_eq!(platforms[1].rect.x, 5.0);
+        assert_eq!(platforms[1].rect.y, 10.0);
+        assert_eq!(platforms[1].rect.width, 10.0);
+        assert_eq!(platforms[1].rect.height, 2.0);
     }
 }
