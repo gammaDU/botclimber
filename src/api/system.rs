@@ -27,17 +27,23 @@ pub fn router() -> Router<Arc<AppState>> {
 
 #[derive(Serialize)]
 struct StageInfo {
-    id: &'static str,
-    label: &'static str,
+    id: String,
+    label: String,
     height: f64,
 }
 
-const AVAILABLE_STAGES: &[StageInfo] = &[
-    StageInfo { id: "default", label: "Default", height: 100.0 },
-];
-
-async fn stages() -> Json<&'static [StageInfo]> {
-    Json(AVAILABLE_STAGES)
+async fn stages(State(state): State<Arc<AppState>>) -> Json<Vec<StageInfo>> {
+    let stages = state
+        .config
+        .fixed_stages
+        .iter()
+        .map(|s| StageInfo {
+            id: s.id.clone(),
+            label: s.name.clone(),
+            height: s.goal_height,
+        })
+        .collect();
+    Json(stages)
 }
 
 // ---------------------------------------------------------------------------

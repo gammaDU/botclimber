@@ -1,12 +1,7 @@
 import { Routes } from '@angular/router';
 
 export const routes: Routes = [
-  { path: '', redirectTo: 'leaderboard', pathMatch: 'full' },
-  {
-    path: 'leaderboard',
-    loadComponent: () =>
-      import('./leaderboard/leaderboard.component').then(m => m.LeaderboardComponent),
-  },
+  { path: '', redirectTo: 'spectate', pathMatch: 'full' },
   {
     path: 'spectate',
     loadComponent: () =>
@@ -17,5 +12,5 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./account/account.component').then(m => m.AccountComponent),
   },
-  { path: '**', redirectTo: 'leaderboard' },
+  { path: '**', redirectTo: 'spectate' },
 ];

@@ -114,7 +114,9 @@ paths:
       tags:
         - Bot
       summary: Get player statistics
-      description: Returns session-specific metrics like maximal height.
+      description: |
+        Returns session-specific metrics like maximal height.
+        Note: Currently returns a "not implemented" placeholder.
       security:
         - ApiKeyAuth: []
       responses:
@@ -123,7 +125,11 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PlayerStatistics'
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "not implemented"
         '401':
           $ref: '#/components/responses/Unauthorized'
         '409':
@@ -135,13 +141,20 @@ paths:
         - Bot
       summary: Reset bot to starting position
       description: |
-        Resets the player's figure to the starting position and restarts the timetrial timer.
-        Only meaningful in Timetrial session type; in other session types the position is reset but no timer is affected.
+        Resets the player's figure to the starting position (0,0) and zeroes its velocity.
       security:
         - ApiKeyAuth: []
       responses:
         '200':
-          description: Reset successful. Player is back at the starting position and the timetrial timer has been restarted.
+          description: Reset successful. Player is back at the starting position.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "ok"
         '401':
           $ref: '#/components/responses/Unauthorized'
         '409':
@@ -285,6 +298,24 @@ paths:
           $ref: '#/components/responses/TooManyRequests'
 
   /admin/mode:
+    get:
+      tags:
+        - Administration
+      summary: Get current game mode
+      description: Administrator only. Returns the active game mode configuration.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Current game mode.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GameModeConfig'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
     post:
       tags:
         - Administration
@@ -331,6 +362,31 @@ paths:
                 $ref: '#/components/schemas/GameModeConfig'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /admin/stages:
+    get:
+      tags:
+        - Administration
+      summary: Get available fixed stages (Admin)
+      description: Administrator only. Returns a list of all available stages loaded from the maps folder.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List of available stages.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id: { type: string }
+                    name: { type: string }
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -444,18 +500,21 @@ paths:
           schema:
             type: string
             enum: [Generated, Fixed]
+        - name: fixed_stage_id
+          in: query
+          description: "Filter by fixed stage identifier."
+          schema:
+            type: string
         - name: session_id
           in: query
           description: "Filter entries by a specific session UUID. When provided, session_type and stage_type filters are ignored."
           schema:
             type: string
-            format: uuid
         - name: user_id
           in: query
           description: "Filter entries by a specific user UUID. Can be combined with session_type, stage_type, or session_id filters."
           schema:
             type: string
-            format: uuid
         - name: limit
           in: query
           description: "Maximum number of entries to return. Defaults to 100."
@@ -663,7 +722,9 @@ components:
         velocity: { $ref: '#/components/schemas/Vector2' }
         dimensions: { $ref: '#/components/schemas/Vector2' }
         session_max_height: { type: number }
-        state: { type: string, enum: [LANDED, JUMPING], description: "The current state of the player figure. LANDED means the figure is stationary on a surface and ready to jump. JUMPING means the figure has non-zero velocity (in flight, falling, or bouncing)." }
+        state: { type: string, enum: [LANDED, JUMPING] }
+        current_time: { type: number, description: "Seconds since session start." }
+        best_time: { type: number, nullable: true, description: "Best time in seconds for Timetrial mode." }
         surrounding_platforms:
           type: array
           items:
@@ -677,10 +738,10 @@ components:
           type: object
           required: [x, y, width, height]
           properties:
-            x: { type: number, description: "Left edge X coordinate of the platform." }
-            y: { type: number, description: "Bottom edge Y coordinate of the platform." }
-            width: { type: number, description: "Width of the platform." }
-            height: { type: number, description: "Height (thickness) of the platform." }
+            x: { type: number }
+            y: { type: number }
+            width: { type: number }
+            height: { type: number }
 
     PlayerStatistics:
       type: object
@@ -707,15 +768,10 @@ components:
     LeaderboardEntry:
       type: object
       properties:
-        user_id: { type: string, format: uuid }
-        session_id: { type: string, format: uuid }
-        name: { type: string }
-        height: { type: number }
-        completion_time_ms:
-          type: integer
-          description: "Time in milliseconds to reach goal height. Present only for Timetrial entries."
-        game_mode:
-          $ref: '#/components/schemas/GameModeConfig'
+        username: { type: string }
+        max_height: { type: number }
+        session_type: { type: string }
+        achieved_at: { type: string, format: date-time }
 
     GameModeConfig:
       type: object
@@ -745,19 +801,21 @@ components:
       type: object
       properties:
         timestamp:
-          type: string
-          format: date-time
-          description: ISO-8601 UTC timestamp of when the snapshot was taken on the server.
+          type: integer
+          format: int64
+          description: Milliseconds since epoch.
+        session_id: { type: string, format: uuid }
         game_mode:
           $ref: '#/components/schemas/GameModeConfig'
+        tick:
+          type: integer
+          format: int64
         players:
           type: array
-          description: All currently active players with their live position, velocity, and state.
           items:
             $ref: '#/components/schemas/SnapshotPlayerEntry'
         platforms:
           type: array
-          description: All currently visible platforms in the world.
           items:
             $ref: '#/components/schemas/Platform'
 
@@ -768,9 +826,9 @@ components:
         name: { type: string }
         position: { $ref: '#/components/schemas/Vector2' }
         velocity: { $ref: '#/components/schemas/Vector2' }
-        dimensions: { $ref: '#/components/schemas/Vector2' }
         state: { type: string, enum: [LANDED, JUMPING] }
-        current_height: { type: number }
+        current_time: { type: number }
+        best_time: { type: number, nullable: true }
 
     ActivePlayerEntry:
       type: object

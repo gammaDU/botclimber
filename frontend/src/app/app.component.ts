@@ -9,7 +9,6 @@ import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
     <header>
       <h1>Botclimber</h1>
       <nav id="nav">
-        <a routerLink="/leaderboard" routerLinkActive="active" class="nav-btn">Leaderboard</a>
         <a routerLink="/spectate"    routerLinkActive="active" class="nav-btn">Spectate</a>
         <a routerLink="/account"     routerLinkActive="active" class="nav-btn">Account</a>
       </nav>
