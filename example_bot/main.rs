@@ -10,7 +10,8 @@
 ///   BOT_API_KEY=your_api_key_here
 mod bot;
 
-use anyhow::{Context, Result, bail};
+use anyhow::{Context, Result};
+use rand::Rng;
 use tokio::time::{Duration, sleep};
 
 use crate::bot::Vector2;
@@ -23,15 +24,42 @@ async fn main() -> Result<()> {
     let manifest_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("example_bot/.env");
     let _ = dotenvy::from_path(&manifest_dir).or_else(|_| dotenvy::dotenv().map(|_| ()));
 
-    let api_key =
-        std::env::var("BOT_API_KEY").context("BOT_API_KEY must be set (in .env or environment)")?;
+    let api_keys_str =
+        std::env::var("BOT_API_KEYS").or_else(|_| std::env::var("BOT_API_KEY")).context("BOT_API_KEYS or BOT_API_KEY must be set (in .env or environment)")?;
+    
+    let api_keys: Vec<String> = api_keys_str.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect();
+    
     let base_url = std::env::var("BOT_BASE_URL").unwrap_or_else(|_| "http://localhost:8080".into());
 
     println!("Botclimber example bot");
     println!("  server  : {base_url}");
+    println!("  bots    : {}", api_keys.len());
     println!();
 
-    let bot = Bot::new(api_key, base_url);
+    let mut handles = Vec::new();
+
+    for (i, api_key) in api_keys.into_iter().enumerate() {
+        let base_url = base_url.clone();
+        if i > 0 {
+            sleep(Duration::from_millis(500)).await;
+        }
+        let handle = tokio::spawn(async move {
+            if let Err(e) = run_bot(api_key, base_url).await {
+                eprintln!("Bot failed: {:?}", e);
+            }
+        });
+        handles.push(handle);
+    }
+
+    for handle in handles {
+        let _ = handle.await;
+    }
+
+    Ok(())
+}
+
+async fn run_bot(api_key: String, base_url: String) -> Result<()> {
+    let bot = Bot::new(api_key.clone(), base_url);
 
     // 1. Join the game
     let JoinResponse {
@@ -39,10 +67,8 @@ async fn main() -> Result<()> {
         session_id,
     } = bot.join().await?;
 
-    println!("Joined session {session_id} as player {player_id}.");
-    println!("================");
-
-    bot.jump(0f64, 15f64).await?;
+    println!("[{api_key}] Joined session {session_id} as player {player_id}.");
+    println!("[{api_key}] ================");
 
     // 2. Jump loop
     loop {
@@ -64,9 +90,12 @@ async fn main() -> Result<()> {
                     .partial_cmp(&b.rect.y)
                     .unwrap_or(std::cmp::Ordering::Equal)
             });
+        
         let Some(next_platform) = next_platform else {
-            bail!("No platforms found!");
+            println!("[{api_key}] No platforms found!");
+            continue;
         };
+        
         let target = Vector2::new(
             next_platform.rect.x + next_platform.rect.width / 2.0,
             next_platform.rect.y + next_platform.rect.height,
@@ -74,7 +103,10 @@ async fn main() -> Result<()> {
 
         let jump = calc_jump(state.position, target);
         if let Some((angle_deg, strength)) = jump {
-            println!("Jumping to {target} (angle_deg={angle_deg}, strength={strength})");
+            let delay = rand::thread_rng().gen_range(500..=1500);
+            println!("[{api_key}] Delaying jump by {}ms...", delay);
+            sleep(Duration::from_millis(delay)).await;
+            println!("[{api_key}] Jumping to {target} (angle_deg={angle_deg}, strength={strength})");
             bot.jump(angle_deg, strength).await?;
         }
     }
