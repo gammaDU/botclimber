@@ -102,8 +102,11 @@ function hashCode(s: string): number {
                   <ul id="session-list">
                       @for (p of playerList; track p.player_id) {
                           <li [class.following]="followId === p.player_id" (click)="follow(p.player_id)" style="flex-direction: column; align-items: stretch;">
-                              <div style="display: flex; justify-content: space-between; width: 100%;">
+                              <div style="display: flex; align-items: center; gap: 6px; width: 100%;">
                                   <span>{{ p.name }}</span>
+                                  @if (followId === p.player_id) {
+                                      <img src="assets/icons/visibility.svg" class="follow-icon" alt="following" />
+                                  }
                               </div>
                               <div style="font-size: 0.8rem; color: var(--text-muted); display: flex; justify-content: space-between; align-items: center; margin-top: 2px;">
                                   <div style="display: flex; gap: 8px;">
