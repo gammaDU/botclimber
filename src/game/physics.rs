@@ -11,7 +11,7 @@ pub const PLAYER_WIDTH: f64 = 0.8;
 pub const PLAYER_HEIGHT: f64 = 0.8;
 
 pub const JUMP_STRENGTH_MIN: f64 = 0.0;
-pub const JUMP_STRENGTH_MAX: f64 = 20.0;
+pub const JUMP_STRENGTH_MAX: f64 = 15.0;
 
 pub const DEATH_DROP: f64 = 15.0;
 
@@ -251,6 +251,12 @@ mod tests {
     fn jump_rejects_negative_strength() {
         let mut p = make_player();
         assert!(apply_jump(&mut p, Vector2::new(0.0, 1.0), -1.0).is_err());
+    }
+
+    #[test]
+    fn jump_rejects_too_high_strength() {
+        let mut p = make_player();
+        assert!(apply_jump(&mut p, Vector2::new(0.0, 1.0), JUMP_STRENGTH_MAX + 1.0).is_err());
     }
 
     #[test]

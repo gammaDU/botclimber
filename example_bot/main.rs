@@ -42,6 +42,8 @@ async fn main() -> Result<()> {
     println!("Joined session {session_id} as player {player_id}.");
     println!("================");
 
+    bot.jump(0f64, 15f64).await?;
+
     // 2. Jump loop
     loop {
         sleep(Duration::from_secs(1)).await;

@@ -121,7 +121,7 @@ No significant mismatches found between the current frontend implementation and 
 | `FRICTION` | 0.5 | Velocity bounce/ground multiplier. |
 | `PLAYER_WIDTH` | 0.8 | Width of the bot's AABB. |
 | `PLAYER_HEIGHT` | 0.8 | Height of the bot's AABB. |
-| `JUMP_STRENGTH_MAX` | 20.0 | Maximum allowed jump impulse. |
+| `JUMP_STRENGTH_MAX` | 15.0 | Maximum allowed jump impulse. |
 | `DEATH_DROP` | 15.0 | Height drop below peak that triggers a reset. |
 
 ## Testing
