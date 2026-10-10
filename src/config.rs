@@ -89,7 +89,7 @@ impl AppConfig {
             .set_default("rate_limiting.user_requests_per_second", 30_i64)?
             .set_default("rate_limiting.user_burst_size", 60_i64)?
             // [game]
-            .set_default("game.default_game_mode", "Checkpoint")?
+            .set_default("game.default_game_mode", "Hardcore")?
             .set_default("game.default_session_type", "Infinite")?
             .set_default("game.default_stage_type", "Generated")?
             .set_default("game.player_timeout_secs", 60_i64)?

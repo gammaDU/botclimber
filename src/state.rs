@@ -32,8 +32,8 @@ impl AppState {
         let mut game_mode = GameModeConfig::default();
 
         // Allow overriding the default game mode from config.
-        if config.game.default_game_mode == "Hardcore" {
-            game_mode.fall_mode = crate::models::FallMode::Hardcore;
+        if config.game.default_game_mode == "Checkpoint" {
+            game_mode.fall_mode = crate::models::FallMode::Checkpoint;
         }
 
         if let Ok(st) = config.game.default_session_type.parse() {

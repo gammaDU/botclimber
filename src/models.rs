@@ -203,7 +203,7 @@ pub struct GameModeConfig {
 impl Default for GameModeConfig {
     fn default() -> Self {
         Self {
-            fall_mode: FallMode::Checkpoint,
+            fall_mode: FallMode::Hardcore,
             session_type: SessionType::Infinite,
             stage_type: StageType::Generated,
             fixed_stage_id: None,

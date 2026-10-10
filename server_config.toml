@@ -19,7 +19,7 @@ user_requests_per_second = 30
 user_burst_size = 60
 
 [game]
-default_game_mode = "Checkpoint"
+default_game_mode = "Hardcore"
 default_session_type = "Timetrial"
 default_stage_type = "Fixed"
 default_stage_id = "tutorial"

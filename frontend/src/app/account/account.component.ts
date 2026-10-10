@@ -207,7 +207,7 @@ export class AccountComponent implements OnInit {
   apiKeyError = '';
   apiKeyCopied = false;
 
-  adminMode: GameModeConfig = { fall_mode: 'Checkpoint', session_type: 'Infinite', stage_type: 'Generated' };
+  adminMode: GameModeConfig = { fall_mode: 'Hardcore', session_type: 'Infinite', stage_type: 'Generated' };
   adminModeError = '';
   adminModeSuccess = '';
   adminSessionError = '';
