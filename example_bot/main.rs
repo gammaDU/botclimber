@@ -76,6 +76,9 @@ async fn run_bot(api_key: String, base_url: String) -> Result<()> {
 
         let state = bot.state().await?;
 
+        if state.position.y == 0f64 {
+            println!("state: {:?}", &state)
+        }
         if state.state != "Landed" {
             continue;
         }

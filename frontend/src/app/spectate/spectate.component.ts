@@ -123,12 +123,8 @@ function hashCode(s: string): number {
                   </ul>
 
                   <div id="cam-controls">
-                      <button [class.active]="followId === null" (click)="follow(null)">Free cam</button>
-                      @if (followId) {
-                          <span id="following-label">
-                            Following: {{ followName }}
-                          </span>
-                      }
+                      <button [class.active]="!directedCam && followId === null" (click)="follow(null)">Free cam</button>
+                      <button [class.active]="directedCam" (click)="toggleDirectedCam()">Directed Cam</button>
                   </div>
               </div>
           </div>
@@ -157,6 +153,7 @@ export class SpectateComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   followId: string | null = null;
+  directedCam = false;
 
   status: 'connecting' | 'connected' | 'loading' | 'ready' | 'reconnecting' | 'disconnected' = 'connecting';
 
@@ -168,6 +165,16 @@ export class SpectateComponent implements OnInit, AfterViewInit, OnDestroy {
   private cogAngles = new Map<string, number>();
   private playerColorIndex = new Map<string, number>();
   private colorCounter = 0;
+
+  // Directed Cam state
+  private botActivity = new Map<string, {
+    lastY: number,
+    activityScore: number,
+    boredom: number,
+    lastJumpTime: number,
+    lastFollowTime: number
+  }>();
+  private lastDirectedSwitch = 0;
 
   private _syncPlayerList(): void {
     this.playerList = Array.from(this.players.values()).sort((a, b) => {
@@ -242,7 +249,17 @@ export class SpectateComponent implements OnInit, AfterViewInit, OnDestroy {
     this.subs.unsubscribe();
   }
 
-  follow(id: string | null): void { this.followId = id; }
+  follow(id: string | null): void {
+    this.followId = id;
+    this.directedCam = false;
+  }
+
+  toggleDirectedCam(): void {
+    this.directedCam = !this.directedCam;
+    if (this.directedCam) {
+      this._updateDirectedCam(true);
+    }
+  }
 
   onWheel(e: WheelEvent): void {
     if (this.followId !== null) return;
@@ -332,17 +349,47 @@ export class SpectateComponent implements OnInit, AfterViewInit, OnDestroy {
       case 'position_update': {
         const id = d['player_id'] as string;
         const existing = this.players.get(id);
+        const y = d['y'] as number;
+        const vy = d['vy'] as number;
+
+        // --- Activity Scoring ---
+        let act = this.botActivity.get(id);
+        if (!act) {
+          act = { lastY: y, activityScore: 0, boredom: 0, lastJumpTime: 0, lastFollowTime: 0 };
+          this.botActivity.set(id, act);
+        }
+
+        const dy = Math.abs(y - act.lastY);
+        // Bonus for movement
+        act.activityScore += dy * 2.0;
+
+        // Bonus for jumping (sudden upward velocity)
+        if (vy > 5 && (performance.now() - act.lastJumpTime > 500)) {
+          act.activityScore += 10;
+          act.lastJumpTime = performance.now();
+        }
+
+        // Weight by height (favor bots higher up)
+        // We'll multiply the final score by a height factor in _updateDirectedCam
+
+        act.lastY = y;
+        // -----------------------
+
         this.players.set(id, {
           player_id: id,
           name: existing?.name ?? id,
           x: d['x'] as number,
-          y: d['y'] as number,
+          y: y,
           vx: d['vx'] as number,
-          vy: d['vy'] as number,
+          vy: vy,
           state: d['state'] as 'LANDED' | 'JUMPING',
           current_time: d['current_time'] as number,
           best_time: d['best_time'] as number,
         });
+
+        if (this.directedCam) {
+          this._updateDirectedCam();
+        }
         break;
       }
       case 'platform_spawn': {
@@ -372,12 +419,17 @@ export class SpectateComponent implements OnInit, AfterViewInit, OnDestroy {
         const id = d['player_id'] as string;
         console.log('player_left', id);
         this.players.delete(id);
-        if (this.followId === id) this.followId = null;
+        this.botActivity.delete(id);
+        if (this.followId === id) {
+          this.followId = null;
+          if (this.directedCam) this._updateDirectedCam(true);
+        }
         break;
       }
       case 'world_reset': {
         this.players.clear();
         this.platforms.clear();
+        this.botActivity.clear();
         this.currentGameMode = d['game_mode'] as GameModeConfig ?? null;
         this.status = 'connected';
         this.eventBuffer = [];
@@ -387,6 +439,63 @@ export class SpectateComponent implements OnInit, AfterViewInit, OnDestroy {
     }
     this._syncPlayerList();
     this.cdr.markForCheck();
+  }
+
+  private _updateDirectedCam(forceSwitch = false): void {
+    const now = performance.now();
+    const MIN_FOLLOW_TIME = 5000; // 5 seconds
+    const SCORE_DECAY = 0.95;
+
+    // 1. Decay all activities and update boredom
+    for (const [id, act] of this.botActivity.entries()) {
+      act.activityScore *= SCORE_DECAY;
+
+      if (id === this.followId) {
+        // Increase boredom for current bot
+        act.boredom += 0.005; // Slightly slower boredom increase
+        if (act.boredom > 1) act.boredom = 1;
+        act.lastFollowTime = now;
+      } else {
+        // Slowly decrease boredom for others
+        act.boredom *= 0.995;
+      }
+    }
+
+    // 2. Check if we should switch
+    if (!forceSwitch && this.followId && (now - this.lastDirectedSwitch < MIN_FOLLOW_TIME)) {
+      return;
+    }
+
+    // 3. Calculate final scores and pick best
+    let bestId: string | null = null;
+    let maxScore = -1;
+
+    for (const [id, player] of this.players.entries()) {
+      const act = this.botActivity.get(id);
+      if (!act) continue;
+
+      // Final score components:
+      // - Activity (movement/jumps)
+      // - Height (favor bots higher up)
+      // - Boredom penalty (massively reduce if watched recently)
+
+      const heightFactor = 1 + (player.y / 100); // 1.0 at 0m, 2.0 at 100m
+      const adjustedScore = (act.activityScore + 5) * heightFactor * (1 - act.boredom);
+
+      if (adjustedScore > maxScore) {
+        maxScore = adjustedScore;
+        bestId = id;
+      }
+    }
+
+    if (bestId && bestId !== this.followId) {
+      this.followId = bestId;
+      this.lastDirectedSwitch = now;
+      // Reset boredom slightly when starting to follow
+      const act = this.botActivity.get(bestId);
+      if (act) act.boredom = 0.2; // Start with some boredom to prevent staying forever
+      this.cdr.markForCheck();
+    }
   }
 
   // ---------------------------------------------------------------------------
