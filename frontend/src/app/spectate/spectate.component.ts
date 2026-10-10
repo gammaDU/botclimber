@@ -1,5 +1,5 @@
 import {
-  Component, OnInit, OnDestroy, ElementRef, ViewChild, AfterViewInit, ChangeDetectionStrategy, ChangeDetectorRef,
+  Component, OnInit, OnDestroy, ElementRef, ViewChild, AfterViewInit, ChangeDetectionStrategy, ChangeDetectorRef, HostListener,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
@@ -138,8 +138,23 @@ function hashCode(s: string): number {
 export class SpectateComponent implements OnInit, AfterViewInit, OnDestroy {
   @ViewChild('canvas') canvasRef!: ElementRef<HTMLCanvasElement>;
 
-  readonly canvasW = CANVAS_W;
-  readonly canvasH = CANVAS_H;
+  canvasW = CANVAS_W;
+  canvasH = CANVAS_H;
+
+  @HostListener('window:resize')
+  onResize(): void {
+    this._updateCanvasSize();
+  }
+
+  private _updateCanvasSize(): void {
+    if (this.canvasRef) {
+      const canvas = this.canvasRef.nativeElement;
+      const rect = canvas.getBoundingClientRect();
+      this.canvasW = CANVAS_W; // Restore fixed width
+      this.canvasH = Math.floor(rect.height);
+      // We don't need to manually set canvas.width/height because [width] and [height] bindings handle it
+    }
+  }
 
   followId: string | null = null;
 
@@ -216,6 +231,8 @@ export class SpectateComponent implements OnInit, AfterViewInit, OnDestroy {
 
   ngAfterViewInit(): void {
     this.ctx = this.canvasRef.nativeElement.getContext('2d')!;
+    this._updateCanvasSize();
+    this.cdr.detectChanges();
     this._scheduleFrame();
   }
 
@@ -389,24 +406,24 @@ export class SpectateComponent implements OnInit, AfterViewInit, OnDestroy {
 
     // ── Background: dark industrial shaft ──
     ctx.fillStyle = '#0d1014';
-    ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+    ctx.fillRect(0, 0, this.canvasW, this.canvasH);
 
     // Vertical depth gradient
-    const grad = ctx.createLinearGradient(0, 0, 0, CANVAS_H);
+    const grad = ctx.createLinearGradient(0, 0, 0, this.canvasH);
     grad.addColorStop(0,   'rgba(0,0,0,0.45)');
     grad.addColorStop(0.4, 'rgba(0,0,0,0)');
     grad.addColorStop(0.6, 'rgba(0,0,0,0)');
     grad.addColorStop(1,   'rgba(0,0,0,0.45)');
     ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+    ctx.fillRect(0, 0, this.canvasW, this.canvasH);
 
     // Faint horizontal structural beams
     ctx.strokeStyle = 'rgba(255,255,255,0.02)';
     ctx.lineWidth = 1;
-    for (let y = 0; y < CANVAS_H; y += 80) {
+    for (let y = 0; y < this.canvasH; y += 80) {
       ctx.beginPath();
       ctx.moveTo(0, y);
-      ctx.lineTo(CANVAS_W, y);
+      ctx.lineTo(this.canvasW, y);
       ctx.stroke();
     }
 
@@ -416,7 +433,7 @@ export class SpectateComponent implements OnInit, AfterViewInit, OnDestroy {
     if (this.followId) {
       const ps = this.players.get(this.followId);
       if (ps) {
-        this.camY = ps.y - (CANVAS_H / 2) / WORLD_SCALE;
+        this.camY = ps.y - (this.canvasH / 2) / WORLD_SCALE;
       }
     }
 
@@ -425,8 +442,8 @@ export class SpectateComponent implements OnInit, AfterViewInit, OnDestroy {
       this.camY = 0;
     }
 
-    const toScreenX = (wx: number) => wx * WORLD_SCALE + CANVAS_W / 2;
-    const toScreenY = (wy: number) => CANVAS_H - (wy - this.camY) * WORLD_SCALE;
+    const toScreenX = (wx: number) => wx * WORLD_SCALE + this.canvasW / 2;
+    const toScreenY = (wy: number) => this.canvasH - (wy - this.camY) * WORLD_SCALE;
 
     // ── Platforms ──
     for (const pl of this.platforms.values()) {
@@ -435,7 +452,7 @@ export class SpectateComponent implements OnInit, AfterViewInit, OnDestroy {
       const sy = toScreenY(r.y + r.height);
       const sw = r.width * WORLD_SCALE;
       const sh = r.height * WORLD_SCALE;
-      if (sy + sh < 0 || sy > CANVAS_H) continue;
+      if (sy + sh < 0 || sy > this.canvasH) continue;
 
       // Base fill
       ctx.fillStyle = '#2e3a44';
@@ -642,11 +659,11 @@ export class SpectateComponent implements OnInit, AfterViewInit, OnDestroy {
     }
 
     // Vignette overlay
-    const vign = ctx.createRadialGradient(CANVAS_W / 2, CANVAS_H / 2, CANVAS_H * 0.3, CANVAS_W / 2, CANVAS_H / 2, CANVAS_H * 0.8);
+    const vign = ctx.createRadialGradient(this.canvasW / 2, this.canvasH / 2, this.canvasH * 0.3, this.canvasW / 2, this.canvasH / 2, this.canvasH * 0.8);
     vign.addColorStop(0, 'rgba(0,0,0,0)');
     vign.addColorStop(1, 'rgba(0,0,0,0.4)');
     ctx.fillStyle = vign;
-    ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+    ctx.fillRect(0, 0, this.canvasW, this.canvasH);
 
     // HUD: following label
     if (this.followId) {
