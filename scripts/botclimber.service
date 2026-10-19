@@ -1,0 +1,25 @@
+[Unit]
+Description=Botclimber Game Server
+After=network.target
+
+[Service]
+Type=simple
+User=botclimber
+Group=botclimber
+WorkingDirectory=/opt/botclimber
+ExecStart=/opt/botclimber/start.sh
+
+# Allow binding to privileged ports (like 80) as a non-root user
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+
+# Environment variables
+# The JWT secret must be at least 32 characters long.
+Environment="BOTCLIMBER__AUTH__JWT_SECRET=                                "
+
+# Optional: Restart on failure
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

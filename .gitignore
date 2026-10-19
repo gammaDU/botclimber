@@ -1,6 +1,8 @@
 /target
 /.idea
-/.data
+/data
 /logs
 /example_bot/target
 /example_bot/.env
+/.package
+/botclimber-release.zip

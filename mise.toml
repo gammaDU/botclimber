@@ -14,7 +14,7 @@ depends = ["frontend-install"]
 
 [tasks.migrate]
 description = "Run database migrations"
-run = "cargo run --bin migrate -- .data/botclimber.db"
+run = "cargo run --bin migrate -- data/botclimber.db"
 
 [tasks.server]
 description = "Start the backend server"
@@ -42,3 +42,8 @@ depends = ["frontend-install"]
 [tasks.docs-build]
 description = "Compile OpenAPI definitions to a static HTML file"
 run = "npx @redocly/cli build-docs docs/openapi.yaml -o frontend/src/assets/api-docs.html"
+
+[tasks.release]
+description = "Create a release zip file with docker-compose and container"
+depends = ["frontend-build"]
+run = 'powershell -ExecutionPolicy Bypass -File scripts/release.ps1'

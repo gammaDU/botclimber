@@ -1,5 +1,5 @@
 [server]
-bind = "0.0.0.0:8080"
+bind = "0.0.0.0:80"
 frontend_dist_path = "frontend/dist"
 
 [database]
