@@ -30,31 +30,11 @@ Copy-Item target/release/botclimber .package/
 Copy-Item target/release/migrate .package/
 
 
-Write-Host "Copying server configuration..."
-Copy-Item server_config.toml .package/
+# Write-Host "Copying server configuration..."
+# Copy-Item server_config.toml .package/
 
-Write-Host "Creating start.sh script..."
-$startScript = @"
-#!/bin/bash
-set -e
-
-# Ensure .data directory exists for SQLite
-mkdir -p .data
-
-# Check for required JWT_SECRET
-if [ -z "`$BOTCLIMBER__AUTH__JWT_SECRET" ]; then
-    echo "ERROR: BOTCLIMBER__AUTH__JWT_SECRET environment variable is not set."
-    echo "Please set it to a secret string of at least 32 characters."
-    exit 1
-fi
-
-echo "Running database migrations..."
-./migrate .data/botclimber.db
-
-echo "Starting Botclimber server..."
-./botclimber server_config.toml
-"@
-$startScript | Out-File -FilePath .package/start.sh -Encoding ascii
+Write-Host "Copying start.sh script..."
+Copy-Item scripts/start.sh .package/
 
 if (Test-Path maps) {
     Write-Host "Copying maps..."

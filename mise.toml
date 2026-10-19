@@ -14,7 +14,7 @@ depends = ["frontend-install"]
 
 [tasks.migrate]
 description = "Run database migrations"
-run = "cargo run --bin migrate -- data/botclimber.db"
+run = "cargo run --bin migrate -- .data/botclimber.db"
 
 [tasks.server]
 description = "Start the backend server"
