@@ -1,6 +1,8 @@
 [server]
-bind = "0.0.0.0:80"
+bind = "0.0.0.0:8443"
 frontend_dist_path = "frontend/dist"
+tls_cert_path = "cert.pem"
+tls_key_path = "key.pem"
 
 [database]
 path = ".data/botclimber.db"

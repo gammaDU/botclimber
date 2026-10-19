@@ -4,8 +4,10 @@ info:
   description: API for the Botclimber competitive multiplayer tower climbing game.
   version: 1.0.0
 servers:
+  - url: https://localhost:8443/api/v1
+    description: Local Development Server (HTTPS)
   - url: /api/v1
-    description: v1 API Server
+    description: Relative path (useful for production)
 paths:
   # --- Bot API ---
   /bot/join:

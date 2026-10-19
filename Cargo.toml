@@ -22,6 +22,7 @@ tokio = { version = "1", features = ["full"] }
 
 # HTTP framework
 axum = { version = "0.8", features = ["ws", "macros"] }
+axum-server = { version = "0.7", features = ["tls-rustls"] }
 tower = "0.5"
 tower-http = { version = "0.6", features = ["fs", "trace"] }
 

@@ -120,8 +120,12 @@ pub struct Bot {
 
 impl Bot {
     pub fn new(api_key: String, base_url: String) -> Self {
+        let client = Client::builder()
+            .danger_accept_invalid_certs(true)
+            .build()
+            .unwrap_or_else(|_| Client::new());
         Self {
-            client: Client::new(),
+            client,
             key: api_key,
             base_url,
         }

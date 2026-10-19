@@ -21,8 +21,14 @@ async fn main() -> Result<()> {
     let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
 
     use tracing_subscriber::prelude::*;
+    let default_filter = if cfg!(debug_assertions) {
+        "botclimber=debug,tower_http=debug"
+    } else {
+        "botclimber=info,tower_http=info"
+    };
+
     let env_filter = tracing_subscriber::EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| "botclimber=debug,tower_http=debug".into());
+        .unwrap_or_else(|_| default_filter.into());
     tracing_subscriber::registry()
         .with(tracing_subscriber::fmt::layer().with_filter(env_filter))
         .with(
@@ -51,13 +57,20 @@ async fn main() -> Result<()> {
     let app = api::router(state.clone());
 
     let bind_addr = cfg.server.bind.parse::<std::net::SocketAddr>()?;
-    info!("Server listening on http://{bind_addr}");
-
-    let listener = tokio::net::TcpListener::bind(bind_addr).await?;
-
-    axum::serve(listener, app)
-        .with_graceful_shutdown(shutdown_signal())
-        .await?;
+    
+    if let (Some(cert_path), Some(key_path)) = (&cfg.server.tls_cert_path, &cfg.server.tls_key_path) {
+        info!("Server listening on https://{bind_addr}");
+        let tls_config = axum_server::tls_rustls::RustlsConfig::from_pem_file(cert_path, key_path).await?;
+        axum_server::bind_rustls(bind_addr, tls_config)
+            .serve(app.into_make_service())
+            .await?;
+    } else {
+        info!("Server listening on http://{bind_addr}");
+        let listener = tokio::net::TcpListener::bind(bind_addr).await?;
+        axum::serve(listener, app)
+            .with_graceful_shutdown(shutdown_signal())
+            .await?;
+    }
 
     info!("Server shut down cleanly");
     Ok(())

@@ -1,6 +1,8 @@
 /target
 /.idea
-/data
+/.data/
+/cert.pem
+/key.pem
 /logs
 /example_bot/target
 /example_bot/.env

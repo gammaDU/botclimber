@@ -7,6 +7,10 @@ pub struct ServerConfig {
     pub bind: String,
     /// Path to the built frontend dist folder served as static files.
     pub frontend_dist_path: String,
+    /// Optional path to the TLS certificate file (PEM).
+    pub tls_cert_path: Option<String>,
+    /// Optional path to the TLS key file (PEM).
+    pub tls_key_path: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -113,6 +117,10 @@ impl AppConfig {
         app_cfg.load_fixed_stages()?;
         app_cfg.validate()?;
         Ok(app_cfg)
+    }
+
+    pub fn is_tls_enabled(&self) -> bool {
+        self.server.tls_cert_path.is_some() && self.server.tls_key_path.is_some()
     }
 
     fn load_fixed_stages(&mut self) -> Result<()> {

@@ -29,7 +29,7 @@ async fn main() -> Result<()> {
     
     let api_keys: Vec<String> = api_keys_str.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect();
     
-    let base_url = std::env::var("BOT_BASE_URL").unwrap_or_else(|_| "http://localhost:8080".into());
+    let base_url = std::env::var("BOT_BASE_URL").unwrap_or_else(|_| "https://localhost:8443".into());
 
     println!("Botclimber example bot");
     println!("  server  : {base_url}");
