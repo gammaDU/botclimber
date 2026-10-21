@@ -193,6 +193,21 @@ export class SpectateComponent implements OnInit, AfterViewInit, OnDestroy {
     });
   }
 
+  private _getMaxCamY(): number | null {
+    const goal = this.currentGameMode?.goal_height;
+    if (goal == null || goal <= 0) return null;
+
+    // The scroll window should be restricted so the top of the viewport
+    // doesn't go above goal_height + 10.
+    // viewportHeight in world units = canvasH / WORLD_SCALE.
+    const viewportHeight = this.canvasH / WORLD_SCALE;
+    const maxVisibleY = goal + 10;
+    const maxCamY = maxVisibleY - viewportHeight;
+
+    // camY should not be less than 0, even if maxCamY is negative (though unlikely)
+    return Math.max(0, maxCamY);
+  }
+
   /** Events buffered before the snapshot arrives. */
   private eventBuffer: WsEnvelope[] = [];
   private snapshotTimestamp = 0;
@@ -269,9 +284,20 @@ export class SpectateComponent implements OnInit, AfterViewInit, OnDestroy {
     e.preventDefault();
     // deltaY > 0 = scroll down → move camera down (lower camY)
     this.camY -= e.deltaY / WORLD_SCALE;
-    // Explicitly clamp to 0 and round to prevent floating point drift below 0
+
+    this._clampCamera();
+  }
+
+  private _clampCamera(): void {
+    // Clamping to 0 (bottom)
     if (this.camY < 0.0001) {
       this.camY = 0;
+    }
+
+    // Clamping to goal height + 10 (top)
+    const maxCamY = this._getMaxCamY();
+    if (maxCamY !== null && this.camY > maxCamY) {
+      this.camY = maxCamY;
     }
   }
 
@@ -549,10 +575,7 @@ export class SpectateComponent implements OnInit, AfterViewInit, OnDestroy {
       }
     }
 
-    // Explicitly clamp to 0 and round to prevent floating point drift below 0
-    if (this.camY < 0.0001) {
-      this.camY = 0;
-    }
+    this._clampCamera();
 
     const toScreenX = (wx: number) => wx * WORLD_SCALE + this.canvasW / 2;
     const toScreenY = (wy: number) => this.canvasH - (wy - this.camY) * WORLD_SCALE;
